@@ -7,8 +7,6 @@ Backups include the full PostgreSQL database (users/password hashes, sessions, d
 3. Copy the printed `backups/carved-….carved-backup.json` file to protected external storage. The script fails if an attachment referenced by the database is missing; investigate rather than accepting an incomplete backup.
 4. Restart the app. Make backups daily and before upgrades; choose retention with the client.
 
-On Windows, `scripts\daily-backup.ps1` performs these steps and proves the archive restores, and `scripts\schedule-backup.ps1` runs it daily. See [Setting up another branch](NEW-BRANCH-SETUP.md#4-turn-on-daily-backups).
-
 Restore safely into a **new, nonexistent** directory:
 
 ```powershell

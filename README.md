@@ -54,7 +54,7 @@ The demo seed refuses any directory that does not end in `/demo`. Prices and ope
 
 ## Operation
 
-See [User guide](docs/USER-GUIDE.md), [Accounting and assumptions](docs/ACCOUNTING.md), [Backup and restore](docs/BACKUP-RESTORE.md), [Setting up another branch](docs/NEW-BRANCH-SETUP.md), and [Verification](docs/VERIFICATION.md).
+See [User guide](docs/USER-GUIDE.md), [Accounting and assumptions](docs/ACCOUNTING.md), [Backup and restore](docs/BACKUP-RESTORE.md), and [Verification](docs/VERIFICATION.md).
 
 ## Verification commands
 
