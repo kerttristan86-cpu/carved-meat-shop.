@@ -1,0 +1,1 @@
+CREATE SEQUENCE IF NOT EXISTS product_code_sequence START WITH 1;
