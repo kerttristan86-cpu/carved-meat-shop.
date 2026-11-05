@@ -8,10 +8,13 @@ the logo, peso signs and full decimal amounts. Printing never posts another sale
 
 1. Open CARVED using its HTTPS address on the tablet. An HTTP LAN address does not
    allow Web Bluetooth; localhost on the development computer is a special case.
-2. Open a saved receipt and tap **Connect Bluetooth printer**.
+2. Complete a sale, or open a saved receipt, and tap **Connect Bluetooth printer**.
 3. Select the printer in Chrome's device chooser. Permission is per device/browser.
-4. Tap **Print receipt**. Check paper output before reprinting.
-5. Reconnect after a page reload or a disconnected printer.
+4. While connected, each newly saved sale prints once by itself. If the receipt of
+   a new sale is open when you connect, it prints straight away. Check the paper.
+5. Reprints of saved receipts stay manual: tap **Print receipt**.
+6. If the connection dropped, CARVED tries to reconnect silently at the next sale.
+   After a page reload Chrome usually requires the tap in step 2 again.
 
 Only known writable printer UART profiles are used (18f0/2af1, ISSC and e781/bef8).
 These are not a universal ESC/POS Bluetooth standard. A Bluetooth Classic-only

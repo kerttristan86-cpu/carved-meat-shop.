@@ -335,6 +335,7 @@ export default function Shop() {
           party_id: request.data.partyId,
           data: result,
           balance: result.total - result.paid,
+          freshSale: true,
         });
       setNotice(
         request.action === "sale"
@@ -2760,6 +2761,8 @@ export default function Shop() {
       )}
       {receipt && (
         <ReceiptDialog
+          key={receipt.id}
+          freshSale={Boolean(receipt.freshSale)}
           document={receipt}
           settings={s.settings}
           related={docs}

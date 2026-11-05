@@ -1,13 +1,15 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Printer, X } from "lucide-react";
 import { php, qty } from "../../lib/money";
 import { date, number } from "./shared";
 import {
+  claimAutoPrint,
   connectBluetoothPrinter,
   bluetoothPrinterName,
   printBluetoothReceipt,
   receiptCanvas,
+  restoreBluetoothPrinter,
 } from "../../lib/thermal-printer";
 
 type R = Record<string, any>;
@@ -18,26 +20,61 @@ export default function ReceiptDialog({
   related,
   customer,
   onClose,
+  freshSale = false,
 }: {
   document: R;
   settings: R;
   related: R[];
   customer: string;
   onClose: () => void;
+  /** A sale just saved at checkout prints by itself. Reprints stay manual. */
+  freshSale?: boolean;
 }) {
   const [message, setMessage] = useState(""),
     [slip, setSlip] = useState(false),
     [busy, setBusy] = useState(false),
-    [connection, setConnection] = useState("");
+    [connection, setConnection] = useState(() => bluetoothPrinterName());
   const settings = d.data.shop || s;
+  async function autoPrint(name: string) {
+    if (!claimAutoPrint(d.id)) return;
+    setBusy(true);
+    setMessage(`Printing on ${name}…`);
+    try {
+      await printBluetoothReceipt(window.document.getElementById("receipt")!);
+      setMessage(
+        `Receipt sent to ${name}. Check the paper. To print another copy, tap Print receipt.`,
+      );
+    } catch (e) {
+      setMessage((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  useEffect(() => {
+    if (!freshSale) return;
+    void (async () => {
+      const name = await restoreBluetoothPrinter();
+      setConnection(name);
+      if (name) await autoPrint(name);
+      else
+        setMessage(
+          "Sale saved. Tap Connect Bluetooth printer to print this receipt.",
+        );
+    })();
+    // Runs once for each receipt that opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   async function connect() {
     setBusy(true);
     try {
       const name = await connectBluetoothPrinter();
       setConnection(name);
-      setMessage(
-        `Connected to ${name}. Tap Print receipt to send this saved receipt.`,
-      );
+      setBusy(false);
+      if (freshSale) await autoPrint(name);
+      else
+        setMessage(
+          `Connected to ${name}. New sales will now print by themselves. Tap Print receipt to reprint this one.`,
+        );
     } catch (e) {
       setConnection(bluetoothPrinterName());
       setMessage((e as Error).message);
@@ -68,6 +105,8 @@ export default function ReceiptDialog({
     setBusy(true);
     try {
       if (connection) {
+        // A manual print counts, so a later reconnect can't print this sale again.
+        claimAutoPrint(d.id);
         await printBluetoothReceipt(window.document.getElementById("receipt")!);
         setMessage(
           "Receipt sent to Bluetooth printer. Check the physical output before reprinting.",
@@ -198,7 +237,9 @@ export default function ReceiptDialog({
             {slip ? "View sales invoice" : "View internal order slip"}
           </button>
           <button disabled={busy} onClick={connect}>
-            Connect Bluetooth printer
+            {connection
+              ? `Connected: ${connection}`
+              : "Connect Bluetooth printer"}
           </button>
           <button disabled={busy} onClick={saveImage}>
             Save receipt image

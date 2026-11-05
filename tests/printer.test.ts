@@ -1,6 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { rasterCommands, sendChunks } from "../lib/thermal-printer";
+import {
+  claimAutoPrint,
+  rasterCommands,
+  sendChunks,
+} from "../lib/thermal-printer";
+
+test("a sale can only be printed automatically once", () => {
+  assert.equal(claimAutoPrint("sale-1"), true);
+  assert.equal(claimAutoPrint("sale-1"), false);
+  assert.equal(claimAutoPrint("sale-2"), true);
+});
 
 test("thermal raster preserves the last pixel and pads partial bytes white", () => {
   const pixels = new Uint8ClampedArray(9 * 4).fill(255);

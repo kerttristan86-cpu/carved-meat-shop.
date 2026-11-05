@@ -172,31 +172,78 @@ export async function connectBluetoothPrinter(): Promise<string> {
   device = undefined;
   characteristic = undefined;
   try {
-    const server = await selected.gatt?.connect();
-    if (!server) throw new Error("No BLE connection");
-    for (const [serviceId, characteristicId] of profiles) {
-      try {
-        const service = await server.getPrimaryService(serviceId);
-        const candidate = await service.getCharacteristic(characteristicId);
-        if (
-          candidate.properties.write ||
-          candidate.properties.writeWithoutResponse
-        ) {
-          device = selected;
-          characteristic = candidate;
-          return selected.name || "Bluetooth printer";
-        }
-      } catch {
-        /* try the next known printer profile */
-      }
-    }
-    throw new Error("Printer UART profile not found");
+    return await attach(selected);
   } catch {
     selected.gatt?.disconnect();
     throw new Error(
       "This device does not expose a supported BLE printer profile. Bluetooth Classic/USB printers need a print service or native bridge. Use System print instead.",
     );
   }
+}
+async function attach(selected: Device): Promise<string> {
+  const server = await selected.gatt?.connect();
+  if (!server) throw new Error("No BLE connection");
+  for (const [serviceId, characteristicId] of profiles) {
+    try {
+      const service = await server.getPrimaryService(serviceId);
+      const candidate = await service.getCharacteristic(characteristicId);
+      if (
+        candidate.properties.write ||
+        candidate.properties.writeWithoutResponse
+      ) {
+        device = selected;
+        characteristic = candidate;
+        const name = selected.name || "Bluetooth printer";
+        try {
+          localStorage.setItem(REMEMBERED_PRINTER, name);
+        } catch {
+          /* remembering the printer is only a convenience */
+        }
+        return name;
+      }
+    } catch {
+      /* try the next known printer profile */
+    }
+  }
+  throw new Error("Printer UART profile not found");
+}
+const REMEMBERED_PRINTER = "carved-bluetooth-printer";
+/**
+ * Silently reconnects to the printer chosen earlier, without opening the chooser.
+ * Resolves to "" when that isn't possible; Chrome may still require a tap.
+ */
+export async function restoreBluetoothPrinter(): Promise<string> {
+  const current = bluetoothPrinterName();
+  if (current || printing) return current;
+  const bluetooth = (navigator as any).bluetooth;
+  try {
+    let known = device;
+    if (!known && bluetooth?.getDevices) {
+      const remembered = localStorage.getItem(REMEMBERED_PRINTER);
+      const permitted: Device[] = await bluetooth.getDevices();
+      known = permitted.find((d) => d.name && d.name === remembered);
+    }
+    if (!known) return "";
+    const target = known;
+    return await Promise.race([
+      attach(target),
+      new Promise<string>((resolve) =>
+        setTimeout(() => resolve(""), RESTORE_TIMEOUT_MS),
+      ),
+    ]);
+  } catch {
+    return "";
+  }
+}
+const RESTORE_TIMEOUT_MS = 5000;
+
+// One automatic print per sale. Claimed before sending and never retried,
+// because a failed transfer may already have put paper out.
+const autoPrinted = new Set<string>();
+export function claimAutoPrint(saleId: string) {
+  if (autoPrinted.has(saleId)) return false;
+  autoPrinted.add(saleId);
+  return true;
 }
 export async function printBluetoothReceipt(element: HTMLElement) {
   if (printing) throw new Error("A receipt is already being sent.");
