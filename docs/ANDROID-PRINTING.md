@@ -46,3 +46,32 @@ large amounts, the rightmost decimals, a long item name, and a connection failur
 
 Reference: Chrome's official Web Bluetooth documentation:
 https://developer.chrome.com/docs/capabilities/bluetooth
+
+## November 5 printing speed update
+
+The raster encoder now emits ESC/POS paper-feed commands for entirely white rows
+and trims white bytes on the right of nonblank bands. Text, logo, pixel positions,
+receipt height, serial settling/draining delays, chunk pacing and cutter commands
+are preserved. The feed path explicitly sets 203-dot motion units (GS P) before
+using ESC J; verify spacing on the actual VOZY during acceptance testing.
+
+A saved 576 x 987 receipt image decreased from 71,137 to 28,189 command bytes
+(60.4% less). This measures payload reduction, not observed physical print time.
+Automated reconstruction tests preserve every black dot and blank row, including
+long feeds, partial bytes and the rightmost dot. Typecheck/build passed; regression
+suite: 33 passed, 3 PostgreSQL concurrency cases skipped without TEST_DATABASE_URL.
+No deployment or database changes were made by this update.
+
+
+## Fast / Sharper print quality
+
+The receipt dialog defaults to Fast and remembers the choice on that browser.
+Fast reduces the raster to half width and height using black-dot-preserving
+max-pooling, then uses ESC/POS double-width/double-height raster mode to retain
+physical paper size. Text and logo edges become bolder and coarser. Choose Sharper
+for the previous full-resolution output. The saved preview and image export retain
+full resolution. Transfer pacing and failed-write handling are unchanged.
+
+The 576 x 987 sample measured 7,553 bytes in Fast versus 28,189 in Sharper (73.2%
+less). Actual elapsed time, spacing, legibility and cutter behavior require a test
+on the physical printer. Fast may add one white dot row for odd image heights.

@@ -9,6 +9,7 @@ async function main() {
     password = randomBytes(18).toString("hex");
   const env = {
     ...process.env,
+    DATABASE_URL: "", // QA always uses its isolated embedded database.
     DATABASE_DIR: `./data/qa-${Date.now()}`,
     BETTER_AUTH_SECRET: randomBytes(32).toString("hex"),
     BETTER_AUTH_URL: "http://127.0.0.1:3100",
@@ -162,6 +163,13 @@ async function main() {
       .getByRole("button", { name: "Complete sale", exact: true })
       .click();
     await page.getByRole("dialog", { name: "Saved receipt preview" }).waitFor();
+    const printQuality = page.getByLabel("Print quality", {exact:true});
+    assert.equal(await printQuality.inputValue(), "fast");
+    await printQuality.selectOption("sharp");
+    assert.equal(await page.evaluate(() => localStorage.getItem("carved-print-quality")), "sharp");
+    await printQuality.selectOption("fast");
+    assert.equal(await page.evaluate(() => localStorage.getItem("carved-print-quality")), "fast");
+
     await page.getByText("₱1,422.05", { exact: true }).first().waitFor();
     await mkdir("test-results", { recursive: true });
     await page.screenshot({

@@ -4,7 +4,93 @@ export function rasterCommands(
   width: number,
   height: number,
   rgba: Uint8ClampedArray,
+  pixelScale: 1 | 2 = 1,
 ): Uint8Array {
+  if (
+    !Number.isInteger(width) ||
+    width < 1 ||
+    width * pixelScale > 576 ||
+    (pixelScale !== 1 && pixelScale !== 2) ||
+    !Number.isInteger(height) ||
+    height < 1 ||
+    height > 20000 ||
+    rgba.length !== width * height * 4
+  )
+    throw new Error("Receipt image dimensions are invalid or too large.");
+  const rowBytes = Math.ceil(width / 8);
+  const bitmap = new Uint8Array(rowBytes * height);
+  const used = new Uint16Array(height);
+  // Keep the same threshold and dots, but do not transmit white paper as pixels.
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4,
+        alpha = rgba[i + 3] / 255;
+      const light =
+        (0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2]) * alpha +
+        255 * (1 - alpha);
+      if (light < 180) {
+        const bx = x >> 3;
+        bitmap[y * rowBytes + bx] |= 128 >> (x & 7);
+        used[y] = bx + 1;
+      }
+    }
+  }
+  const parts: number[] = [27, 64];
+  let motionUnitsSet = false;
+  for (let top = 0; top < height;) {
+    if (!used[top]) {
+      let end = top + 1;
+      while (end < height && !used[end]) end++;
+      // ESC J advances white rows without sending a full-width bitmap.
+      // Set 203-dot motion units explicitly so spacing matches the raster.
+      if (!motionUnitsSet) {
+        parts.push(29, 80, 203, 203);
+        motionUnitsSet = true;
+      }
+      for (let remaining = (end - top) * pixelScale; remaining > 0;) {
+        const dots = Math.min(255, remaining);
+        parts.push(27, 74, dots);
+        remaining -= dots;
+      }
+      top = end;
+      continue;
+    }
+    let end = top + 1,
+      bandWidth = used[top];
+    while (end < height && used[end] && end - top < 128) {
+      bandWidth = Math.max(bandWidth, used[end]);
+      end++;
+    }
+    const rows = end - top;
+    // Trim white bytes on the right only: left alignment and decimals stay exact.
+    parts.push(
+      29,
+      118,
+      48,
+      pixelScale === 2 ? 3 : 0,
+      bandWidth & 255,
+      bandWidth >> 8,
+      rows & 255,
+      rows >> 8,
+    );
+    for (let y = top; y < end; y++) {
+      for (let x = 0; x < bandWidth; x++) parts.push(bitmap[y * rowBytes + x]);
+    }
+    top = end;
+  }
+  parts.push(27, 100, 4, 29, 86, 66, 0);
+  return Uint8Array.from(parts);
+}
+
+/** Half-size raster expanded by the printer to the original paper size.
+ * Max-pooling keeps thin strokes and rightmost decimals; edges are coarser.
+ * It cuts the dense bitmap payload by 75% without overrunning printer buffers.
+ */
+export function fastRasterCommands(
+  width: number,
+  height: number,
+  rgba: Uint8ClampedArray,
+) {
   if (
     !Number.isInteger(width) ||
     width < 1 ||
@@ -15,40 +101,31 @@ export function rasterCommands(
     rgba.length !== width * height * 4
   )
     throw new Error("Receipt image dimensions are invalid or too large.");
-  const rowBytes = Math.ceil(width / 8);
-  const parts: number[] = [27, 64];
-  // Short raster bands avoid printer buffer/height limits.
-  for (let top = 0; top < height; top += 128) {
-    const rows = Math.min(128, height - top);
-    parts.push(
-      29,
-      118,
-      48,
-      0,
-      rowBytes & 255,
-      rowBytes >> 8,
-      rows & 255,
-      rows >> 8,
-    );
-    for (let y = top; y < top + rows; y++) {
-      for (let bx = 0; bx < rowBytes; bx++) {
-        let bits = 0;
-        for (let bit = 0; bit < 8; bit++) {
-          const x = bx * 8 + bit;
-          if (x >= width) continue;
-          const i = (y * width + x) * 4,
-            a = rgba[i + 3] / 255;
-          const luminance =
-            (0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2]) * a +
-            255 * (1 - a);
-          if (luminance < 180) bits |= 128 >> bit;
-        }
-        parts.push(bits);
+  const w = Math.ceil(width / 2),
+    h = Math.ceil(height / 2);
+  const pixels = new Uint8ClampedArray(w * h * 4).fill(255);
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4,
+        alpha = rgba[i + 3] / 255;
+      const light =
+        (0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2]) * alpha +
+        255 * (1 - alpha);
+      if (light < 180) {
+        const target = (Math.floor(y / 2) * w + Math.floor(x / 2)) * 4;
+        pixels[target] = pixels[target + 1] = pixels[target + 2] = 0;
       }
     }
+  return rasterCommands(w, h, pixels, 2);
+}
+export function readPrintQuality(): "fast" | "sharp" {
+  try {
+    return localStorage.getItem("carved-print-quality") === "sharp"
+      ? "sharp"
+      : "fast";
+  } catch {
+    return "fast";
   }
-  parts.push(27, 100, 4, 29, 86, 66, 0);
-  return Uint8Array.from(parts);
 }
 
 export async function sendChunks(
@@ -103,7 +180,7 @@ export async function receiptCanvas(element: HTMLElement) {
   // Normalize explicitly so the last amount column stays within 576 printer dots.
   const output = document.createElement("canvas");
   output.width = 576;
-  output.height = Math.ceil(canvas.height * 576 / canvas.width);
+  output.height = Math.ceil((canvas.height * 576) / canvas.width);
   const context = output.getContext("2d");
   if (!context) throw new Error("Cannot render receipt image.");
   context.fillStyle = "white";
@@ -177,12 +254,9 @@ const SERIAL_CHUNK_BYTES = 128;
 const SERIAL_CHUNK_PAUSE_MS = 20;
 const SERIAL_LINK_SETTLE_MS = 500;
 const SERIAL_DRAIN_MS = 2500;
-const wait = (ms: number) =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 function usesSerial() {
-  return (
-    "serial" in navigator && !/android/i.test(navigator.userAgent)
-  );
+  return "serial" in navigator && !/android/i.test(navigator.userAgent);
 }
 async function sendSerial(port: SerialPort, data: Uint8Array) {
   try {
@@ -221,9 +295,7 @@ export async function connectBluetoothPrinter(): Promise<string> {
       throw new Error("Wait for the current receipt to finish sending.");
     // Called directly from a tap: requestPort requires user activation.
     const chosen: SerialPort = await (navigator as any).serial.requestPort({
-      allowedBluetoothServiceClassIds: [
-        "00001101-0000-1000-8000-00805f9b34fb",
-      ],
+      allowedBluetoothServiceClassIds: ["00001101-0000-1000-8000-00805f9b34fb"],
     });
     if (serialPort && serialPort !== chosen)
       await serialPort.forget?.().catch(() => {});
@@ -336,7 +408,9 @@ export async function printBluetoothReceipt(element: HTMLElement) {
     const canvas = await receiptCanvas(element);
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Cannot render receipt image.");
-    const data = rasterCommands(
+    const encode =
+      readPrintQuality() === "sharp" ? rasterCommands : fastRasterCommands;
+    const data = encode(
       canvas.width,
       canvas.height,
       ctx.getImageData(0, 0, canvas.width, canvas.height).data,

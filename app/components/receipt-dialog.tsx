@@ -10,6 +10,7 @@ import {
   printBluetoothReceipt,
   receiptCanvas,
   restoreBluetoothPrinter,
+  readPrintQuality,
 } from "../../lib/thermal-printer";
 
 type R = Record<string, any>;
@@ -33,7 +34,11 @@ export default function ReceiptDialog({
   const [message, setMessage] = useState(""),
     [slip, setSlip] = useState(false),
     [busy, setBusy] = useState(false),
-    [connection, setConnection] = useState(() => bluetoothPrinterName());
+    [connection, setConnection] = useState(() => bluetoothPrinterName()),
+    [quality, setQuality] = useState<"fast" | "sharp">("fast");
+  useEffect(() => {
+    setQuality(readPrintQuality());
+  }, []);
   const settings = d.data.shop || s;
   async function autoPrint(name: string) {
     if (!claimAutoPrint(d.id)) return;
@@ -56,10 +61,7 @@ export default function ReceiptDialog({
       const name = await restoreBluetoothPrinter();
       setConnection(name);
       if (name) await autoPrint(name);
-      else
-        setMessage(
-          "Sale saved. Tap Connect printer to print this receipt.",
-        );
+      else setMessage("Sale saved. Tap Connect printer to print this receipt.");
     })();
     // Runs once for each receipt that opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -236,10 +238,31 @@ export default function ReceiptDialog({
           <button disabled={busy} onClick={() => setSlip((v) => !v)}>
             {slip ? "View sales invoice" : "View internal order slip"}
           </button>
+          <label className="field" style={{ width: "100%" }}>
+            <span>Print quality</span>
+            <select
+              aria-label="Print quality"
+              disabled={busy}
+              value={quality}
+              onChange={(e) => {
+                const value = e.target.value as "fast" | "sharp";
+                try {
+                  localStorage.setItem("carved-print-quality", value);
+                } catch {
+                  setMessage(
+                    "Cannot save print quality. Allow browser storage and try again.",
+                  );
+                  return;
+                }
+                setQuality(value);
+              }}
+            >
+              <option value="fast">Fast � bolder, coarser edges</option>
+              <option value="sharp">Sharper � slower printing</option>
+            </select>
+          </label>
           <button disabled={busy} onClick={connect}>
-            {connection
-              ? `Connected: ${connection}`
-              : "Connect printer"}
+            {connection ? `Connected: ${connection}` : "Connect printer"}
           </button>
           <button disabled={busy} onClick={saveImage}>
             Save receipt image

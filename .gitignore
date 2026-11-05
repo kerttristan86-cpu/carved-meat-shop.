@@ -10,3 +10,5 @@ playwright-report/
 .media-tools/
 video-analysis/
 __pycache__/
+.vercel
+*.crt
