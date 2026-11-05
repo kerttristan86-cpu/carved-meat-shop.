@@ -173,6 +173,12 @@ type SerialPort = {
   forget?(): Promise<void>;
 };
 let serialPort: SerialPort | undefined;
+const SERIAL_CHUNK_BYTES = 128;
+const SERIAL_CHUNK_PAUSE_MS = 20;
+const SERIAL_LINK_SETTLE_MS = 500;
+const SERIAL_DRAIN_MS = 2500;
+const wait = (ms: number) =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 function usesSerial() {
   return (
     "serial" in navigator && !/android/i.test(navigator.userAgent)
@@ -189,7 +195,17 @@ async function sendSerial(port: SerialPort, data: Uint8Array) {
   try {
     const writer = port.writable!.getWriter();
     try {
-      await sendChunks(data, (chunk) => writer.write(chunk), 256, 15);
+      // This link has no flow control: faster sends overrun the printer, which
+      // then reads the rest of the image as text and misses the cut command.
+      await wait(SERIAL_LINK_SETTLE_MS);
+      await sendChunks(
+        data,
+        (chunk) => writer.write(chunk),
+        SERIAL_CHUNK_BYTES,
+        SERIAL_CHUNK_PAUSE_MS,
+      );
+      // Closing too early can drop the last bytes, including the cut.
+      await wait(SERIAL_DRAIN_MS);
       await writer.close();
     } finally {
       writer.releaseLock();
