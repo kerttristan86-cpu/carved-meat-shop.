@@ -54,11 +54,13 @@ export function rasterCommands(
 export async function sendChunks(
   bytes: Uint8Array,
   write: (chunk: Uint8Array) => Promise<void>,
+  size = 20,
+  pauseMs = 5,
 ) {
   try {
-    for (let i = 0; i < bytes.length; i += 20) {
-      await write(bytes.slice(i, i + 20));
-      await new Promise((resolve) => setTimeout(resolve, 5));
+    for (let i = 0; i < bytes.length; i += size) {
+      await write(bytes.slice(i, i + size));
+      await new Promise((resolve) => setTimeout(resolve, pauseMs));
     }
   } catch {
     // Never retry automatically: bytes may already have printed.
@@ -154,11 +156,64 @@ export function bluetoothSupport(): string | null {
   return null;
 }
 export function bluetoothPrinterName() {
+  if (serialPort) return SERIAL_NAME;
   return device?.gatt?.connected && characteristic
     ? device.name || "Bluetooth printer"
     : "";
 }
+
+// Windows and other desktops: the printer's Bluetooth serial (COM) link. It stays
+// remembered across reloads, and is only held open while a receipt is sending so
+// other programs can still use the printer.
+const SERIAL_NAME = "Receipt printer";
+type SerialPort = {
+  writable: WritableStream<Uint8Array> | null;
+  open(options: { baudRate: number }): Promise<void>;
+  close(): Promise<void>;
+  forget?(): Promise<void>;
+};
+let serialPort: SerialPort | undefined;
+function usesSerial() {
+  return (
+    "serial" in navigator && !/android/i.test(navigator.userAgent)
+  );
+}
+async function sendSerial(port: SerialPort, data: Uint8Array) {
+  try {
+    await port.open({ baudRate: 9600 });
+  } catch {
+    throw new Error(
+      "Can't reach the printer. Check that it is on and paired, then tap Print receipt. The saved sale is safe.",
+    );
+  }
+  try {
+    const writer = port.writable!.getWriter();
+    try {
+      await sendChunks(data, (chunk) => writer.write(chunk), 256, 15);
+      await writer.close();
+    } finally {
+      writer.releaseLock();
+    }
+  } finally {
+    await port.close().catch(() => {});
+  }
+}
+
 export async function connectBluetoothPrinter(): Promise<string> {
+  if (usesSerial()) {
+    if (printing)
+      throw new Error("Wait for the current receipt to finish sending.");
+    // Called directly from a tap: requestPort requires user activation.
+    const chosen: SerialPort = await (navigator as any).serial.requestPort({
+      allowedBluetoothServiceClassIds: [
+        "00001101-0000-1000-8000-00805f9b34fb",
+      ],
+    });
+    if (serialPort && serialPort !== chosen)
+      await serialPort.forget?.().catch(() => {});
+    serialPort = chosen;
+    return SERIAL_NAME;
+  }
   const unavailable = bluetoothSupport();
   if (unavailable) throw new Error(unavailable);
   if (printing)
@@ -215,6 +270,15 @@ const REMEMBERED_PRINTER = "carved-bluetooth-printer";
 export async function restoreBluetoothPrinter(): Promise<string> {
   const current = bluetoothPrinterName();
   if (current || printing) return current;
+  if (usesSerial()) {
+    try {
+      const ports: SerialPort[] = await (navigator as any).serial.getPorts();
+      serialPort = ports[ports.length - 1];
+    } catch {
+      serialPort = undefined;
+    }
+    return serialPort ? SERIAL_NAME : "";
+  }
   const bluetooth = (navigator as any).bluetooth;
   try {
     let known = device;
@@ -247,11 +311,10 @@ export function claimAutoPrint(saleId: string) {
 }
 export async function printBluetoothReceipt(element: HTMLElement) {
   if (printing) throw new Error("A receipt is already being sent.");
+  const port = serialPort;
   const target = characteristic;
-  if (!target || !device?.gatt?.connected)
-    throw new Error(
-      "Printer disconnected. Tap Connect Bluetooth printer again.",
-    );
+  if (!port && (!target || !device?.gatt?.connected))
+    throw new Error("Printer disconnected. Tap Connect printer again.");
   printing = true;
   try {
     const canvas = await receiptCanvas(element);
@@ -262,10 +325,14 @@ export async function printBluetoothReceipt(element: HTMLElement) {
       canvas.height,
       ctx.getImageData(0, 0, canvas.width, canvas.height).data,
     );
+    if (port) {
+      await sendSerial(port, data);
+      return;
+    }
     await sendChunks(data, (chunk) =>
-      target.properties.write
-        ? target.writeValueWithResponse(chunk)
-        : target.writeValueWithoutResponse(chunk),
+      target!.properties.write
+        ? target!.writeValueWithResponse(chunk)
+        : target!.writeValueWithoutResponse(chunk),
     );
   } finally {
     printing = false;

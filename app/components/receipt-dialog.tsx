@@ -58,7 +58,7 @@ export default function ReceiptDialog({
       if (name) await autoPrint(name);
       else
         setMessage(
-          "Sale saved. Tap Connect Bluetooth printer to print this receipt.",
+          "Sale saved. Tap Connect printer to print this receipt.",
         );
     })();
     // Runs once for each receipt that opens.
@@ -109,7 +109,7 @@ export default function ReceiptDialog({
         claimAutoPrint(d.id);
         await printBluetoothReceipt(window.document.getElementById("receipt")!);
         setMessage(
-          "Receipt sent to Bluetooth printer. Check the physical output before reprinting.",
+          "Receipt sent to the printer. Check the physical output before reprinting.",
         );
         return;
       }
@@ -239,7 +239,7 @@ export default function ReceiptDialog({
           <button disabled={busy} onClick={connect}>
             {connection
               ? `Connected: ${connection}`
-              : "Connect Bluetooth printer"}
+              : "Connect printer"}
           </button>
           <button disabled={busy} onClick={saveImage}>
             Save receipt image

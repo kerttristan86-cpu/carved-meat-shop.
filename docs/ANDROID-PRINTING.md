@@ -21,6 +21,13 @@ These are not a universal ESC/POS Bluetooth standard. A Bluetooth Classic-only
 printer will not become BLE-capable through a website change. Use a compatible
 Android print service/native bridge for Classic or USB hardware.
 
+## Windows Chrome or Edge with a paired Bluetooth printer
+
+Desktop browsers send to the printer's Bluetooth serial (COM) link, bypassing the
+Windows print queue. Pair the printer in Windows, tap **Connect printer** and choose
+its outgoing COM port. The choice is remembered, so new sales print by themselves,
+even after a reload. The port is only held open while a receipt is sending.
+
 ## iPhone/iPad and other browsers
 
 Tap **System print** to use the operating system's available printers/services.
