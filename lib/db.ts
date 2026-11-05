@@ -1,8 +1,8 @@
-import { PGlite } from "@electric-sql/pglite";
 import { readFile, mkdir, readdir } from "node:fs/promises";
 import path from "node:path";
 import { claimDirectory } from "./directory-lock";
-export async function migrate(db: PGlite) {
+import type { Database } from "./postgres";
+export async function migrate(db: Database) {
   await db.exec(
     "CREATE TABLE IF NOT EXISTS schema_migrations(version text PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())",
   );
@@ -30,14 +30,20 @@ export async function migrate(db: PGlite) {
     });
   }
 }
-const globalDb = globalThis as unknown as { carvedDb?: Promise<PGlite> };
+const globalDb = globalThis as unknown as { carvedDb?: Promise<Database> };
 export function database() {
   if (globalDb.carvedDb) return globalDb.carvedDb;
-  const opening = (async () => {
+  const opening = (async (): Promise<Database> => {
+    // Hosted schema changes run through `npm run migrate`, never during a request.
+    if (process.env.DATABASE_URL) {
+      const { openPostgres } = await import("./postgres");
+      return openPostgres(process.env.DATABASE_URL);
+    }
+    const { PGlite } = await import("@electric-sql/pglite");
     const directory = process.env.DATABASE_DIR || "./data/production";
     await mkdir(path.dirname(path.resolve(directory)), { recursive: true });
     const release = await claimDirectory(directory);
-    let db: PGlite | undefined;
+    let db: InstanceType<typeof PGlite> | undefined;
     try {
       db = new PGlite(directory);
       await migrate(db);

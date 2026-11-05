@@ -1,8 +1,11 @@
 import { authentication } from "../../../lib/auth";
 import { database } from "../../../lib/db";
-import { mkdir, writeFile } from "node:fs/promises";
+import {
+  attachmentLimit,
+  prepareAttachment,
+  storeAttachment,
+} from "../../../lib/attachments";
 import { randomUUID } from "node:crypto";
-import path from "node:path";
 export const runtime = "nodejs";
 export async function POST(req: Request) {
   const session = await (
@@ -16,17 +19,19 @@ export async function POST(req: Request) {
   )
     return Response.json({ error: "Origin rejected" }, { status: 403 });
   try {
-    if (Number(req.headers.get("content-length") || 0) > 5500000)
-      throw new Error("Attachment limit is 5 MB");
+    const limit = attachmentLimit(),
+      megabytes = limit / 1000000;
+    if (Number(req.headers.get("content-length") || 0) > limit + 500000)
+      throw new Error(`Attachment limit is ${megabytes} MB`);
     const form = await req.formData(),
       file = form.get("file"),
       documentId = form.get("documentId");
     if (
       !(file instanceof File) ||
       typeof documentId !== "string" ||
-      file.size > 5000000
+      file.size > limit
     )
-      throw new Error("Choose a PDF, PNG or JPEG up to 5 MB");
+      throw new Error(`Choose a PDF, PNG or JPEG up to ${megabytes} MB`);
     const data = Buffer.from(await file.arrayBuffer());
     const mime =
       data.subarray(0, 5).toString() === "%PDF-"
@@ -50,17 +55,13 @@ export async function POST(req: Request) {
     )
       throw new Error("Expense not found");
     const id = randomUUID();
-    const dir = path.resolve(
-      process.env.DATABASE_DIR || "./data/production",
-      "attachments",
-    );
-    await mkdir(dir, { recursive: true });
-    await writeFile(path.join(dir, id), data, { flag: "wx" });
+    await prepareAttachment(id, data);
     await db.transaction(async (tx) => {
       await tx.query(
         "INSERT INTO attachments(id,document_id,name,mime) VALUES($1,$2,$3,$4)",
         [id, documentId, file.name.slice(0, 150), mime],
       );
+      await storeAttachment(tx, id, data);
       await tx.query("INSERT INTO audit VALUES($1,now(),$2,$3,$4)", [
         randomUUID(),
         session.user.id,

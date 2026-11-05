@@ -1,11 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { PGlite } from "@electric-sql/pglite";
-import { migrate } from "../lib/db";
+import { testDatabase } from "./support/test-db";
 import { execute, snapshot } from "../lib/shop";
 test("one-step product restock receives stock and cost exactly once", async () => {
-  const db = new PGlite();
-  await migrate(db);
+  const db = await testDatabase();
   const p = await execute(
     db,
     "product",

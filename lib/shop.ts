@@ -1,10 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
-import type { PGlite, Transaction } from "@electric-sql/pglite";
+import { readTransaction, type Database, type Queryable } from "./postgres";
 import { z } from "zod";
 import { money, quantity, prorate } from "./money";
 import { requireStock } from "./stock-validation";
 import { latestInvoiceLinks } from "./invoice-reconciliation";
-type DB = PGlite | Transaction;
+type DB = Queryable;
 type Row = Record<string, any>;
 const text = (v: unknown, max = 200) =>
   z.string().trim().min(1).max(max).parse(v);
@@ -114,7 +114,7 @@ function list(v: unknown): Row[] {
 }
 
 export async function execute(
-  db: PGlite,
+  db: Database,
   action: string,
   input: Row,
   key: string,
@@ -847,9 +847,9 @@ export async function execute(
   });
 }
 
-export async function snapshot(db: PGlite, from?: string, to?: string) {
+export async function snapshot(db: Database, from?: string, to?: string) {
   // One read transaction gives stock, documents and financial reports the same consistent view.
-  return db.transaction(async (tx) => {
+  return readTransaction(db, async (tx) => {
     const products = await rows(
         tx,
         "SELECT * FROM products ORDER BY category,name",

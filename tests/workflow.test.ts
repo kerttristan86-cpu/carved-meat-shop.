@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { PGlite } from "@electric-sql/pglite";
 import { migrate } from "../lib/db";
+import { testDatabase } from "./support/test-db";
 import { execute, snapshot } from "../lib/shop";
 import { lineAmount } from "../lib/money";
 
@@ -19,8 +20,7 @@ test("decimal fixture and precision rejection", () => {
 });
 
 test("connected receiving, transfer, credit sale, payments, return, costs and journals", async () => {
-  const db = new PGlite();
-  await migrate(db);
+  const db = await testDatabase();
   let n = 0;
   const run = (action: string, data: Record<string, unknown>, key?: string) =>
     execute(db, action, data, key ?? `test-${++n}`, "owner");
@@ -214,8 +214,7 @@ test("changing receipt costs use weighted average and binary backup restores ful
 });
 
 test("bulk boundary, service stock, physical counts, spoilage, partial refund and missing prices", async () => {
-  const db = new PGlite();
-  await migrate(db);
+  const db = await testDatabase();
   let n = 0;
   const run = (a: string, d: any) => execute(db, a, d, `k${++n}`, "owner");
   const p = await run("product", {

@@ -1,11 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { PGlite } from "@electric-sql/pglite";
-import { migrate } from "../lib/db";
+import { testDatabase } from "./support/test-db";
 import { execute, snapshot } from "../lib/shop";
 test("blank product codes generate unique codes, avoid manual codes and survive edits and retries", async () => {
-  const db = new PGlite();
-  await migrate(db);
+  const db = await testDatabase();
   let n = 0;
   const run = (d: any, key?: string) =>
     execute(db, "product", d, key || "product-" + ++n, "owner");

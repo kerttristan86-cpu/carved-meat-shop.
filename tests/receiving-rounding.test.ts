@@ -1,7 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { PGlite } from "@electric-sql/pglite";
-import { migrate } from "../lib/db";
+import { testDatabase } from "./support/test-db";
 import { execute, snapshot } from "../lib/shop";
 
 for (const mode of [
@@ -9,8 +8,7 @@ for (const mode of [
   "repeated same-index lines",
 ] as const) {
   test(`partial receiving rounds cumulative cost for ${mode}`, async () => {
-    const db = new PGlite();
-    await migrate(db);
+    const db = await testDatabase();
     let sequence = 0;
     const run = (action: string, data: Record<string, unknown>) =>
       execute(db, action, data, `receiving-rounding-${++sequence}`, "owner");
@@ -71,8 +69,7 @@ for (const mode of [
 }
 
 test("ordinary fractional deliveries reconcile to the full ordered line cost", async () => {
-  const db = new PGlite();
-  await migrate(db);
+  const db = await testDatabase();
   let sequence = 0;
   const run = (action: string, data: Record<string, unknown>) =>
     execute(db, action, data, `ordinary-receiving-${++sequence}`, "owner");

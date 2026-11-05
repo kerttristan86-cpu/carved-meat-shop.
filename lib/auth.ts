@@ -1,8 +1,17 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { drizzle } from "drizzle-orm/pglite";
 import { database } from "./db";
 import * as schema from "./auth-schema";
+import { PostgresDatabase } from "./postgres";
+async function orm() {
+  const db = await database();
+  if (db instanceof PostgresDatabase) {
+    const { drizzle } = await import("drizzle-orm/node-postgres");
+    return drizzle(db.pool, { schema });
+  }
+  const { drizzle } = await import("drizzle-orm/pglite");
+  return drizzle(db as never, { schema });
+}
 export async function authentication(bootstrap = false) {
   const secret = process.env.BETTER_AUTH_SECRET;
   if (!secret || secret.length < 32 || secret.startsWith("replace-"))
@@ -11,7 +20,7 @@ export async function authentication(bootstrap = false) {
     appName: "CARVED",
     secret,
     baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
-    database: drizzleAdapter(drizzle(await database(), { schema }), {
+    database: drizzleAdapter(await orm(), {
       provider: "pg",
       schema,
     }),

@@ -1,11 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { PGlite } from "@electric-sql/pglite";
-import { migrate } from "../lib/db";
+import { testDatabase } from "./support/test-db";
 import { execute, snapshot } from "../lib/shop";
 test("reject changed price in a saved cart and use expense business date in reports", async () => {
-  const db = new PGlite();
-  await migrate(db);
+  const db = await testDatabase();
   let n = 0;
   const run = (a: string, d: any) =>
     execute(db, a, d, "integrity-" + ++n, "owner");
@@ -45,8 +43,7 @@ test("reject changed price in a saved cart and use expense business date in repo
   await db.close();
 });
 test("owner funding and operational count gains are distinct from revenue and opening equity", async () => {
-  const db = new PGlite();
-  await migrate(db);
+  const db = await testDatabase();
   let n = 0;
   const run = (a: string, d: any) =>
     execute(db, a, d, "capital-" + ++n, "owner");
@@ -88,8 +85,7 @@ test("owner funding and operational count gains are distinct from revenue and op
   await db.close();
 });
 test("many tiny returns never refund more than original rounded amount or COGS", async () => {
-  const db = new PGlite();
-  await migrate(db);
+  const db = await testDatabase();
   let n = 0;
   const run = (a: string, d: any) => execute(db, a, d, "tiny-" + ++n, "owner");
   const p = await run("product", {
