@@ -1,3 +1,4 @@
+import { nativeReceipt, imageReceipt } from "./native-receipt";
 // ESC/POS monochrome raster. Rasterizing the existing preview preserves the logo,
 // peso symbol, decimal amounts and layout without relying on printer code pages.
 export function rasterCommands(
@@ -137,7 +138,8 @@ export async function sendChunks(
   try {
     for (let i = 0; i < bytes.length; i += size) {
       await write(bytes.slice(i, i + size));
-      await new Promise((resolve) => setTimeout(resolve, pauseMs));
+      if (pauseMs > 0 && i + size < bytes.length)
+        await new Promise((resolve) => setTimeout(resolve, pauseMs));
     }
   } catch {
     // Never retry automatically: bytes may already have printed.
@@ -405,24 +407,36 @@ export async function printBluetoothReceipt(element: HTMLElement) {
     throw new Error("Printer disconnected. Tap Connect printer again.");
   printing = true;
   try {
-    const canvas = await receiptCanvas(element);
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("Cannot render receipt image.");
-    const encode =
-      readPrintQuality() === "sharp" ? rasterCommands : fastRasterCommands;
-    const data = encode(
-      canvas.width,
-      canvas.height,
-      ctx.getImageData(0, 0, canvas.width, canvas.height).data,
-    );
+    let data: Uint8Array;
+    const native = readPrintQuality() !== "sharp";
+    if (native) {
+      let includeLogo = true;
+      try {
+        includeLogo = localStorage.getItem("carved-print-logo") !== "off";
+      } catch {}
+      data = await nativeReceipt(element, includeLogo);
+    } else {
+      const canvas = await receiptCanvas(element);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Cannot render receipt image.");
+      data = imageReceipt(
+        canvas.width,
+        canvas.height,
+        ctx.getImageData(0, 0, canvas.width, canvas.height).data,
+      );
+    }
     if (port) {
       await sendSerial(port, data);
       return;
     }
-    await sendChunks(data, (chunk) =>
-      target!.properties.write
-        ? target!.writeValueWithResponse(chunk)
-        : target!.writeValueWithoutResponse(chunk),
+    await sendChunks(
+      data,
+      (chunk) =>
+        target!.properties.write
+          ? target!.writeValueWithResponse(chunk)
+          : target!.writeValueWithoutResponse(chunk),
+      20,
+      native && target!.properties.write ? 0 : 5,
     );
   } finally {
     printing = false;

@@ -75,3 +75,29 @@ full resolution. Transfer pacing and failed-write handling are unchanged.
 The 576 x 987 sample measured 7,553 bytes in Fast versus 28,189 in Sharper (73.2%
 less). Actual elapsed time, spacing, legibility and cutter behavior require a test
 on the physical printer. Fast may add one white dot row for odd image heights.
+
+## November 6: APX-style native text replaces Fast image mode
+
+Fast text now builds ESC/POS text commands from the saved receipt preview instead
+of rasterizing its text. It uses Font A, normal character size, default 30-dot line
+spacing, safe margins and wrapped 42-column rows. Full decimals are retained; only
+headers, product names and totals are emphasized. PHP replaces the peso symbol,
+following APX's code-page-independent approach. Text with Latin accents is
+transliterated for printer compatibility; image mode retains original glyphs.
+
+The small 144-dot logo is cached locally in memory and can be omitted using
+Include logo for the fastest printing. The original preview and image export are
+unchanged. Image fallback now transmits normal full-resolution bands, including
+blank rows; the scaled/coarse raster and blank-row feed shortcuts are not used by
+printing. On acknowledged BLE writes, the native path does not add an extra fixed
+pause after the acknowledgment. Unacknowledged writes keep conservative pacing;
+serial link settling and draining remain unchanged. No automatic retry is added.
+
+Browser QA captures both logo and text-only jobs and checks real saved amounts and
+the final feed/cut commands without touching a physical printer or live database.
+Physical output, print speed and cutter operation still require a VOZY test.
+
+Native browser transmission test (November 6): the QA receipt sent 3,282 bytes with
+the logo and 670 bytes without it. These are captured command-byte counts, not
+physical print-time measurements. The complete browser flow passed, including
+saved preferences, native text/amounts and a single final feed/cut sequence.

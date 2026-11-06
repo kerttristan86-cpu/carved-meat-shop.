@@ -35,9 +35,13 @@ export default function ReceiptDialog({
     [slip, setSlip] = useState(false),
     [busy, setBusy] = useState(false),
     [connection, setConnection] = useState(() => bluetoothPrinterName()),
-    [quality, setQuality] = useState<"fast" | "sharp">("fast");
+    [quality, setQuality] = useState<"fast" | "sharp">("fast"),
+    [includeLogo, setIncludeLogo] = useState(true);
   useEffect(() => {
     setQuality(readPrintQuality());
+    try {
+      setIncludeLogo(localStorage.getItem("carved-print-logo") !== "off");
+    } catch {}
   }, []);
   const settings = d.data.shop || s;
   async function autoPrint(name: string) {
@@ -239,9 +243,9 @@ export default function ReceiptDialog({
             {slip ? "View sales invoice" : "View internal order slip"}
           </button>
           <label className="field" style={{ width: "100%" }}>
-            <span>Print quality</span>
+            <span>Print mode</span>
             <select
-              aria-label="Print quality"
+              aria-label="Print mode"
               disabled={busy}
               value={quality}
               onChange={(e) => {
@@ -261,6 +265,34 @@ export default function ReceiptDialog({
               <option value="sharp">Sharper � slower printing</option>
             </select>
           </label>
+          {quality === "fast" && (
+            <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <input
+                type="checkbox"
+                style={{ width: 20, minHeight: 20 }}
+                checked={includeLogo}
+                disabled={busy}
+                onChange={(e) => {
+                  try {
+                    localStorage.setItem(
+                      "carved-print-logo",
+                      e.target.checked ? "on" : "off",
+                    );
+                    setIncludeLogo(e.target.checked);
+                  } catch {
+                    setMessage(
+                      "Allow browser storage to save print preferences.",
+                    );
+                  }
+                }}
+              />
+              Include logo (turn off for fastest printing)
+            </label>
+          )}
+          <p>
+            Fast text uses the printer font and PHP currency labels. The receipt
+            preview keeps its original appearance.
+          </p>
           <button disabled={busy} onClick={connect}>
             {connection ? `Connected: ${connection}` : "Connect printer"}
           </button>

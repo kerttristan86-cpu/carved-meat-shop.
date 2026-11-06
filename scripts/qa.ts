@@ -163,7 +163,7 @@ async function main() {
       .getByRole("button", { name: "Complete sale", exact: true })
       .click();
     await page.getByRole("dialog", { name: "Saved receipt preview" }).waitFor();
-    const printQuality = page.getByLabel("Print quality", {exact:true});
+    const printQuality = page.getByLabel("Print mode", {exact:true});
     assert.equal(await printQuality.inputValue(), "fast");
     await printQuality.selectOption("sharp");
     assert.equal(await page.evaluate(() => localStorage.getItem("carved-print-quality")), "sharp");
@@ -171,6 +171,32 @@ async function main() {
     assert.equal(await page.evaluate(() => localStorage.getItem("carved-print-quality")), "fast");
 
     await page.getByText("₱1,422.05", { exact: true }).first().waitFor();
+    // Exercise the actual printing path without a physical printer or live records.
+    await page.evaluate(`(() => {
+      const state = window; state.qaPrintBytes = [];
+      Object.defineProperty(navigator, "userAgent", { configurable:true, value:"Android QA" });
+      const characteristic = {properties:{write:true,writeWithoutResponse:false},writeValueWithResponse:async(bytes)=>{state.qaPrintBytes.push(...Array.from(bytes));}};
+      const device = {name:"QA native printer",gatt:{connected:true,connect:async()=>({getPrimaryService:async()=>({getCharacteristic:async()=>characteristic})}),disconnect:()=>{}}};
+      Object.defineProperty(navigator,"bluetooth",{configurable:true,value:{requestDevice:async()=>device,getDevices:async()=>[]}});
+    })()`);
+    await page.getByRole("button",{name:"Connect printer",exact:true}).click();
+    try { await page.getByRole("status").filter({hasText:"Receipt sent to QA native printer"}).waitFor(); }
+    catch (error) { console.log("Receipt status:",await page.getByRole("status").allTextContents());throw error; }
+    const nativeWithLogo = await page.evaluate(()=> (window as any).qaPrintBytes as number[]);
+    assert.ok(nativeWithLogo.length<5000, "Native body plus small logo remains compact");
+    assert.ok(new TextDecoder().decode(new Uint8Array(nativeWithLogo)).includes("PHP 1,422.05"));
+    await page.getByLabel(/Include logo/).uncheck();
+    await page.evaluate(()=>{(window as any).qaPrintBytes=[];});
+    await page.getByRole("button",{name:"Print receipt",exact:true}).click();
+    await page.getByRole("status").filter({hasText:"Receipt sent to the printer"}).waitFor();
+    const nativeNoLogo=await page.evaluate(()=> (window as any).qaPrintBytes as number[]);
+    assert.ok(nativeNoLogo.length<1500,"Text-only receipt should be far smaller than an image");
+    const nativeText=new TextDecoder().decode(new Uint8Array(nativeNoLogo));
+    assert.ok(nativeText.includes("Pork shoulder"));assert.ok(nativeText.includes("PHP 1,422.05"));
+    assert.deepEqual(nativeNoLogo.slice(-7),[27,100,4,29,86,66,0]);
+    console.log(`Native receipt bytes: ${nativeWithLogo.length} with logo; ${nativeNoLogo.length} text only`);
+    await page.getByLabel(/Include logo/).check();
+
     await mkdir("test-results", { recursive: true });
     await page.screenshot({
       path: "test-results/tablet-receipt.png",
