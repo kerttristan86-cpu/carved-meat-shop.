@@ -150,6 +150,36 @@ async function main() {
     await page.getByText('Saved successfully.',{exact:true}).waitFor();
     const restocked=await (await context.request.get('http://127.0.0.1:3100/api/shop')).json();
     assert.equal(restocked.stock.find((x:any)=>x.product_id===p.id&&x.location_id==='storage').quantity,82500);
+    await page.evaluate(`(() => {
+      const state=window;state.qaPrintBytes=[];state.qaPrintTargets=[];state.qaPrinterChoices=0;state.qaPrinterDiscovery=0;state.qaPrinterName="QA native printer";state.qaWriteFailures=0;
+      state.qaDevices={};
+      Object.defineProperty(navigator,"userAgent",{configurable:true,value:"Android QA"});
+      const makeDevice=name=>{
+        const characteristic={properties:{write:true,writeWithoutResponse:false},writeValueWithResponse:async(bytes)=>{
+          if(state.qaWriteFailures>0){state.qaWriteFailures--;throw new Error("Simulated disconnect");}
+          state.qaPrintTargets.push(name);state.qaPrintBytes.push(...Array.from(bytes));
+        }};
+        const gatt={connected:false,connect:async()=>{gatt.connected=true;return {getPrimaryService:async()=>({getCharacteristic:async()=>characteristic})};},disconnect:()=>{gatt.connected=false;}};
+        return {name,gatt};
+      };
+      localStorage.setItem("carved-bluetooth-printer","QA remembered printer");
+      Object.defineProperty(navigator,"bluetooth",{configurable:true,value:{
+        requestDevice:async()=>{state.qaPrinterChoices++;const d=makeDevice(state.qaPrinterName);state.qaDevices[d.name]=d;return d;},
+        getDevices:async()=>{state.qaPrinterDiscovery++;return [makeDevice("QA remembered printer")];}
+      }});
+    })()`);
+    await page.getByRole("button",{name:"Settings",exact:true}).click();
+    await page.getByRole("heading",{name:"Printer & data",exact:true}).waitFor();
+    await page.getByRole("status").filter({hasText:"No printer connected"}).waitFor();
+    assert.equal(await page.evaluate(()=>(window as any).qaPrinterChoices),0);
+    assert.equal(await page.evaluate(()=>(window as any).qaPrinterDiscovery),0);
+    await page.getByRole("button",{name:"Connect printer",exact:true}).click();
+    await page.getByRole("status").filter({hasText:"Connected: QA native printer"}).waitFor();
+    assert.equal(await page.evaluate(()=>(window as any).qaPrintBytes.length),0,"Pairing must not print anything");
+    await page.evaluate(()=>{(window as any).qaPrinterName="QA selected printer";});
+    await page.getByRole("button",{name:"Change printer",exact:true}).click();
+    await page.getByRole("status").filter({hasText:"Connected: QA selected printer"}).waitFor();
+    await page.screenshot({path:"test-results/settings-printer-android.png",fullPage:true});
     await page
       .getByRole("button", { name: "Sales / POS", exact: true })
       .click();
@@ -171,19 +201,20 @@ async function main() {
     assert.equal(await page.evaluate(() => localStorage.getItem("carved-print-quality")), "fast");
 
     await page.getByText("₱1,422.05", { exact: true }).first().waitFor();
-    // Exercise the actual printing path without a physical printer or live records.
-    await page.evaluate(`(() => {
-      const state = window; state.qaPrintBytes = [];
-      Object.defineProperty(navigator, "userAgent", { configurable:true, value:"Android QA" });
-      const characteristic = {properties:{write:true,writeWithoutResponse:false},writeValueWithResponse:async(bytes)=>{state.qaPrintBytes.push(...Array.from(bytes));}};
-      const device = {name:"QA native printer",gatt:{connected:true,connect:async()=>({getPrimaryService:async()=>({getCharacteristic:async()=>characteristic})}),disconnect:()=>{}}};
-      Object.defineProperty(navigator,"bluetooth",{configurable:true,value:{requestDevice:async()=>device,getDevices:async()=>[]}});
-    })()`);
-    await page.getByRole("button",{name:"Connect printer",exact:true}).click();
-    try { await page.getByRole("status").filter({hasText:"Receipt sent to QA native printer"}).waitFor(); }
+    try { await page.getByRole("status").filter({hasText:"Receipt sent to QA selected printer"}).waitFor(); }
     catch (error) { console.log("Receipt status:",await page.getByRole("status").allTextContents());throw error; }
+    assert.equal(await page.evaluate(()=>(window as any).qaPrinterChoices),2,"POS must reuse the manually selected Settings printer");
+    assert.equal(await page.evaluate(()=>(window as any).qaPrinterDiscovery),0,"No background printer discovery may override the selected printer");
+    assert.deepEqual(await page.evaluate(()=>[...new Set((window as any).qaPrintTargets)]),["QA selected printer"]);
     const nativeWithLogo = await page.evaluate(()=> (window as any).qaPrintBytes as number[]);
-    assert.ok(nativeWithLogo.length<5000, "Native body plus small logo remains compact");
+    assert.ok(nativeWithLogo.length<2500, "Native body plus 96-dot logo remains compact");
+    const logoHeader=nativeWithLogo.findIndex((b,i)=>b===29&&nativeWithLogo[i+1]===118&&nativeWithLogo[i+2]===48);
+    assert.ok(logoHeader>=0,"Native receipt includes the logo raster");
+    assert.deepEqual(nativeWithLogo.slice(logoHeader,logoHeader+8),[29,118,48,0,12,0,96,0]);
+    const cutSequence=[27,100,4,29,86,66,0];
+    const cutCount=(bytes:number[])=>bytes.filter((_,i)=>cutSequence.every((b,k)=>bytes[i+k]===b)).length;
+    assert.deepEqual(nativeWithLogo.slice(-7),cutSequence);
+    assert.equal(cutCount(nativeWithLogo),1,"New POS sale prints exactly one complete receipt");
     assert.ok(new TextDecoder().decode(new Uint8Array(nativeWithLogo)).includes("PHP 1,422.05"));
     await page.getByLabel(/Include logo/).uncheck();
     await page.evaluate(()=>{(window as any).qaPrintBytes=[];});
@@ -235,9 +266,36 @@ async function main() {
     );
     await page.getByRole("button", { name: "Close receipt" }).click();
     await page.getByRole("button", { name: "Receipts", exact: true }).click();
+    await page.evaluate(()=>{(window as any).qaPrintBytes=[];});
     await page.getByRole("button", { name: "Preview", exact: true }).click();
     await page.getByRole("dialog", { name: "Saved receipt preview" }).waitFor();
+    await page.getByRole("button",{name:"Connected: QA selected printer",exact:true}).waitFor();
+    assert.equal(await page.evaluate(()=>(window as any).qaPrintBytes.length),0,"Saved receipts never auto-print");
+    assert.equal(await page.evaluate(()=>(window as any).qaPrinterChoices),2);
+    await page.getByRole("button",{name:"Print receipt",exact:true}).click();
+    await page.getByRole("status").filter({hasText:"Receipt sent to the printer"}).waitFor();
+    const reprint=await page.evaluate(()=>(window as any).qaPrintBytes as number[]);
+    assert.ok(new TextDecoder().decode(new Uint8Array(reprint)).includes("PHP 1,422.05"));
+    assert.equal(cutCount(reprint),1,"One manual tap prints one saved receipt");
+    // A failed write must not trigger an automatic resend.
+    await page.evaluate(()=>{(window as any).qaPrintBytes=[];(window as any).qaWriteFailures=1;});
+    await page.getByRole("button",{name:"Print receipt",exact:true}).click();
+    await page.getByRole("status").filter({hasText:"may be partial"}).waitFor();
+    assert.equal(await page.evaluate(()=>(window as any).qaPrintBytes.length),0);
     await page.getByRole("button", { name: "Close receipt" }).click();
+    await page.getByRole("button",{name:"Settings",exact:true}).click();
+    await page.getByRole("status").filter({hasText:"Connected: QA selected printer"}).waitFor();
+    await page.evaluate(()=>{(window as any).qaDevices["QA selected printer"].gatt.connected=false;});
+    await page.getByRole("status").filter({hasText:"No printer connected"}).waitFor();
+    assert.equal(await page.evaluate(()=>(window as any).qaPrinterChoices),2,"Disconnected status must not open a chooser");
+    assert.equal(await page.evaluate(()=>(window as any).qaPrinterDiscovery),0);
+    // Another browser context may share the login, but never the printer state.
+    const otherContext=await browser.newContext({storageState:{cookies:await context.cookies(),origins:[]}});
+    const otherPage=await otherContext.newPage();
+    await otherPage.goto("http://127.0.0.1:3100",{waitUntil:"domcontentloaded"});
+    await otherPage.getByRole("button",{name:"Settings",exact:true}).click();
+    await otherPage.getByRole("status").filter({hasText:"No printer connected"}).waitFor();
+    await otherContext.close();
     const sale = before.documents.find((d: any) => d.kind === "sale");
     assert.equal(sale.data.change, 7795);
     assert.equal(

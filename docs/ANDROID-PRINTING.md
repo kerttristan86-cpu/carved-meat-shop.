@@ -101,3 +101,23 @@ Native browser transmission test (November 6): the QA receipt sent 3,282 bytes w
 the logo and 670 bytes without it. These are captured command-byte counts, not
 physical print-time measurements. The complete browser flow passed, including
 saved preferences, native text/amounts and a single final feed/cut sequence.
+
+
+## Branch 1: connect in Settings before POS
+
+Open Settings > Printer & data > Connect printer on the Android device/browser
+that will run POS. Select the printer in Chrome's chooser. Settings shows its
+connection name and notices disconnection without reconnecting automatically.
+Use Change printer to choose a different device. No printer selection is saved
+in the shop database, and another browser does not inherit the connection.
+
+New completed POS sales reuse that in-memory connection and print once. Opening
+a saved receipt does not print; tap Print receipt for a manual copy. The existing
+duplicate-print claim and failed-transfer no-retry behavior remain in place.
+Receipt opening does not enumerate permitted printers or silently reconnect.
+After a reload/disconnection, reconnect with an explicit button tap.
+
+Native receipts now use a cached 96-dot logo, with full amount text and the same
+final feed/cut sequence. The optional logo and image fallback remain available.
+Desktop serial opening, pacing, draining and closing are unchanged; the reverted
+connection-reuse change was not copied. These changes apply to Branch 1 only.

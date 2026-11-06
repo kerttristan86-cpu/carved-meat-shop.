@@ -182,10 +182,10 @@ export async function nativeReceipt(
     else {
       await img.decode();
       const canvas = document.createElement("canvas");
-      canvas.width = 144;
+      canvas.width = 96;
       canvas.height = Math.max(
         1,
-        Math.round((144 * img.naturalHeight) / img.naturalWidth),
+        Math.round((canvas.width * img.naturalHeight) / img.naturalWidth),
       );
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error("Cannot prepare receipt logo.");

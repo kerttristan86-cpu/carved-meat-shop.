@@ -9,7 +9,6 @@ import {
   bluetoothPrinterName,
   printBluetoothReceipt,
   receiptCanvas,
-  restoreBluetoothPrinter,
   readPrintQuality,
 } from "../../lib/thermal-printer";
 
@@ -61,12 +60,15 @@ export default function ReceiptDialog({
   }
   useEffect(() => {
     if (!freshSale) return;
-    void (async () => {
-      const name = await restoreBluetoothPrinter();
-      setConnection(name);
-      if (name) await autoPrint(name);
-      else setMessage("Sale saved. Tap Connect printer to print this receipt.");
-    })();
+    // Use only the connection explicitly chosen on this browser. Never start
+    // background pairing here: a late reconnect could replace a manual choice.
+    const name = bluetoothPrinterName();
+    setConnection(name);
+    if (name) void autoPrint(name);
+    else
+      setMessage(
+        "Sale saved. Connect a printer in Settings or tap Connect printer here.",
+      );
     // Runs once for each receipt that opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

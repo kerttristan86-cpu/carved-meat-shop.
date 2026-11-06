@@ -35,6 +35,7 @@ import {
 } from "../lib/ui-validation";
 import MovementTable from "./components/movement-table";
 import ReceiptDialog from "./components/receipt-dialog";
+import PrinterConnectionSettings from "./components/printer-connection-settings";
 import ReviewExport from "./components/review-export";
 import InvoiceReconciliation from "./components/invoice-reconciliation";
 import AuditHistory from "./components/audit-history";
@@ -2147,9 +2148,7 @@ export default function Shop() {
               </section>
             </>
           )}
-          {page === "Audit history" && (
-            <AuditHistory shop={s} />
-          )}
+          {page === "Audit history" && <AuditHistory shop={s} />}
           {page === "Settings" && (
             <div className="settings-grid">
               <section className="panel">
@@ -2192,18 +2191,7 @@ export default function Shop() {
                   <Printer size={20} />
                 </div>
                 <div className="settings-body">
-                  <Pill tone="amber">VOZY G80 · hardware unverified</Pill>
-                  <p>
-                    Browser print fallback is available. Confirm the tablet OS,
-                    connection, command protocol, printable width, and cutting
-                    behavior with the actual hardware.
-                  </p>
-                  <p>
-                    <strong>Adapter:</strong>{" "}
-                    {s.settings.printer === "browser"
-                      ? "Browser print dialog"
-                      : "Direct printer not configured"}
-                  </p>
+                  <PrinterConnectionSettings />
                   <button
                     onClick={() => {
                       const d = docs.find((d) => d.kind === "sale");

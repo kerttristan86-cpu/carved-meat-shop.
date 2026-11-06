@@ -53,3 +53,93 @@ test("image fallback retains blank rows and never uses scaled or dot-feed shortc
     ],
   );
 });
+
+test("fast logo keeps the artwork with under half the old Bluetooth image payload", async () => {
+  const { nativeReceipt, rasterImage } = await import("../lib/native-receipt");
+  let decodes = 0;
+  const canvases: { width: number; height: number }[] = [];
+  const img = {
+    src: "test://compact-logo",
+    naturalWidth: 144,
+    naturalHeight: 144,
+    async decode() {
+      decodes++;
+    },
+  };
+  const element = {
+    querySelector: () => img,
+    children: [
+      {
+        classList: { contains: (name: string) => name === "receipt-total" },
+        firstElementChild: { textContent: "TOTAL", tagName: "STRONG" },
+        lastElementChild: { textContent: "PHP 1,795.00" },
+      },
+    ],
+  } as unknown as HTMLElement;
+  const previous = Object.getOwnPropertyDescriptor(globalThis, "document");
+  Object.defineProperty(globalThis, "document", {
+    configurable: true,
+    value: {
+      createElement() {
+        const canvas = {
+          width: 0,
+          height: 0,
+          getContext() {
+            return {
+              fillStyle: "",
+              fillRect() {},
+              drawImage() {},
+              getImageData() {
+                return {
+                  data: new Uint8ClampedArray(
+                    canvas.width * canvas.height * 4,
+                  ).map((_, i) => (i % 4 === 3 ? 255 : 0)),
+                };
+              },
+            };
+          },
+        };
+        canvases.push(canvas);
+        return canvas;
+      },
+    },
+  });
+  try {
+    const withLogo = await nativeReceipt(element, true);
+    const withoutLogo = await nativeReceipt(element, false);
+    const repeated = await nativeReceipt(element, true);
+    assert.equal(canvases[0].width, 96);
+    assert.equal(canvases[0].height, 96);
+    const oldLogo = rasterImage(
+      144,
+      144,
+      new Uint8ClampedArray(144 * 144 * 4).fill(255),
+    );
+    assert.ok(withLogo.length - withoutLogo.length < oldLogo.length / 2);
+    const header = Array.from(withLogo).findIndex(
+      (value, i, bytes) =>
+        value === 29 && bytes[i + 1] === 118 && bytes[i + 2] === 48,
+    );
+    assert.deepEqual(
+      Array.from(withLogo.slice(header, header + 8)),
+      [29, 118, 48, 0, 12, 0, 96, 0],
+    );
+    assert.ok(
+      withLogo
+        .slice(header + 8, header + 8 + 1152)
+        .every((value) => value === 255),
+      "Black artwork remains in the logo bitmap",
+    );
+    assert.ok(new TextDecoder().decode(withLogo).includes("PHP 1,795.00"));
+    assert.deepEqual(
+      Array.from(withLogo.slice(-7)),
+      [27, 100, 4, 29, 86, 66, 0],
+    );
+    assert.deepEqual(repeated, withLogo);
+    assert.equal(decodes, 1);
+    assert.equal(canvases.length, 1);
+  } finally {
+    if (previous) Object.defineProperty(globalThis, "document", previous);
+    else Reflect.deleteProperty(globalThis, "document");
+  }
+});
