@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readTransaction, type Database, type Queryable } from "./postgres";
 import { z } from "zod";
-import { money, quantity, prorate } from "./money";
+import { money, quantity, prorate, boxCount } from "./money";
 import { requireStock } from "./stock-validation";
 import { latestInvoiceLinks } from "./invoice-reconciliation";
 type DB = Queryable;
@@ -275,11 +275,7 @@ export async function execute(
           name: p.name,
           quantity: positive(quantity(l.quantity)),
           cost: positive(money(l.cost)),
-          boxes: z
-            .number()
-            .int()
-            .min(0)
-            .parse(l.boxes || 0),
+          boxes: boxCount(l.boxes),
         });
       }
       const d = await insertDoc(
@@ -328,11 +324,7 @@ export async function execute(
           index,
           quantity: q,
           value,
-          boxes: z
-            .number()
-            .int()
-            .min(0)
-            .parse(l.boxes || 0),
+          boxes: boxCount(l.boxes),
         });
       }
       const d = await insertDoc(
@@ -535,11 +527,7 @@ export async function execute(
           price,
           amount,
           cost,
-          boxes: z
-            .number()
-            .int()
-            .min(0)
-            .parse(l.boxes || 0),
+          boxes: tier === "box" ? boxCount(l.boxes) : 0,
           overrideReason: String(l.overrideReason || "").slice(0, 300),
         };
         lines.push(line);

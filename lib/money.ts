@@ -39,3 +39,18 @@ export const php = (c: number) =>
     c / 100,
   );
 export const qty = (n: number) => (n / 1000).toFixed(3);
+
+export function boxCount(value: unknown): number {
+  const message =
+    "Box count must be a whole number (0, 1, 2...). Enter decimal weight in Weight (kg).";
+  if (value == null || value === "") return 0;
+  if (typeof value !== "number" && typeof value !== "string")
+    throw new Error(message);
+  const input = typeof value === "string" ? value.trim() : value;
+  if (input === "") return 0;
+  if (typeof input === "string" && !/^\d+(?:\.0+)?$/.test(input))
+    throw new Error(message);
+  const count = Number(input);
+  if (!Number.isSafeInteger(count) || count < 0) throw new Error(message);
+  return count;
+}

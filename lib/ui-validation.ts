@@ -1,28 +1,35 @@
-import { quantity, lineAmount } from "./money";
+import { quantity, lineAmount, boxCount } from "./money";
 export function validateCartLine(line: Record<string, any>) {
   if (!Number.isSafeInteger(line.price) || line.price <= 0)
     throw new Error("Invalid product price");
   if (quantity(line.quantity) <= 0)
     throw new Error("Quantity must be greater than zero");
   lineAmount(line.quantity, (line.price / 100).toFixed(2));
+  if (line.tier === "box") boxCount(line.boxes);
 }
 export function restoreCart(value: unknown): Record<string, any>[] {
   if (!Array.isArray(value)) return [];
-  return value.filter((l) => {
-    try {
-      if (
-        !l ||
-        typeof l.productId !== "string" ||
-        typeof l.name !== "string" ||
-        !["retail", "bulk", "box"].includes(l.tier)
-      )
+  return value
+    .map((line) =>
+      line && typeof line === "object" && line.tier !== "box"
+        ? { ...line, boxes: 0 }
+        : line,
+    )
+    .filter((l) => {
+      try {
+        if (
+          !l ||
+          typeof l.productId !== "string" ||
+          typeof l.name !== "string" ||
+          !["retail", "bulk", "box"].includes(l.tier)
+        )
+          return false;
+        validateCartLine(l);
+        return true;
+      } catch {
         return false;
-      validateCartLine(l);
-      return true;
-    } catch {
-      return false;
-    }
-  });
+      }
+    });
 }
 export function stockStatus(grams: number, threshold: number) {
   return grams === 0

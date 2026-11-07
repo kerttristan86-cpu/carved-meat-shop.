@@ -1,6 +1,7 @@
 import { authentication } from "../../../lib/auth";
 import { database } from "../../../lib/db";
 import { execute, snapshot } from "../../../lib/shop";
+import { shopErrorMessage } from "../../../lib/shop-errors";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 async function owner(req: Request) {
@@ -68,16 +69,6 @@ export async function POST(req: Request) {
       ),
     );
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Unable to save";
-    return Response.json(
-      {
-        error: message.includes("duplicate key")
-          ? "This code or name already exists"
-          : message.includes("foreign key")
-            ? "Select an existing product, party and location"
-            : message,
-      },
-      { status: 400 },
-    );
+    return Response.json({ error: shopErrorMessage(e) }, { status: 400 });
   }
 }

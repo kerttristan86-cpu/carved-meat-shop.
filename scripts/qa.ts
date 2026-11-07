@@ -183,8 +183,28 @@ async function main() {
     await page
       .getByRole("button", { name: "Sales / POS", exact: true })
       .click();
+    const beforeBadCount=await (await context.request.get("http://127.0.0.1:3100/api/shop")).json();
+    const badCount=await context.request.post("http://127.0.0.1:3100/api/shop",{
+      data:{action:"sale",key:"qa-invalid-box-count",data:{locationId:"freezer",lines:[{productId:p.id,quantity:"1.250",tier:"box",boxes:1.25}],tendered:"300"}},headers:{origin:"http://127.0.0.1:3100"}
+    });
+    assert.equal(badCount.status(),400);const badCountError=await badCount.json();
+    assert.match(badCountError.error,/Box count must be a whole number/);assert.ok(!badCountError.error.includes("invalid_type"));
+    const invalidIndex=await context.request.post("http://127.0.0.1:3100/api/shop",{
+      data:{action:"receive",key:"qa-invalid-line-index",data:{orderId:po.id,locationId:"storage",lines:[{index:0.5,quantity:"1",boxes:0}]}},headers:{origin:"http://127.0.0.1:3100"}
+    });
+    assert.equal(invalidIndex.status(),400);const invalidIndexError=await invalidIndex.json();assert.match(invalidIndexError.error,/whole number/);assert.ok(!invalidIndexError.error.includes("safeint"));
+    const afterBadCount=await (await context.request.get("http://127.0.0.1:3100/api/shop")).json();assert.deepEqual(afterBadCount.stock,beforeBadCount.stock);assert.equal(afterBadCount.documents.length,beforeBadCount.documents.length);
     await page.getByRole("button", { name: /QA-P1 · Pork/ }).click();
-    await page.getByLabel("Quantity", { exact: true }).fill("5.950");
+    await page.getByLabel("Selling price tier",{exact:true}).selectOption("box");
+    await page.getByLabel("Quantity",{exact:true}).fill("1.250");
+    await page.getByLabel("Box count (actual kg entered separately)",{exact:true}).fill("1.25");
+    await page.getByRole("button",{name:"Add to order",exact:true}).click();
+    await page.getByRole("alert").filter({hasText:"Box count must be a whole number"}).waitFor();
+    assert.equal(await page.locator(".cart-line").count(),0,"Invalid box counts must be rejected before adding to the cart");
+    await page.screenshot({path:"test-results/pos-box-count-validation.png",fullPage:true});
+    await page.getByLabel("Selling price tier",{exact:true}).selectOption("retail");
+    assert.equal(await page.getByLabel("Box count (actual kg entered separately)",{exact:true}).count(),0);
+    await page.getByLabel("Quantity",{exact:true}).fill("5.950");
     await page
       .getByRole("button", { name: "Add to order", exact: true })
       .click();

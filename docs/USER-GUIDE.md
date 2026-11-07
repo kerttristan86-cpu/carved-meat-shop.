@@ -24,3 +24,13 @@
 12. **End of day:** Reconcile cash tender/change against payments, review receivables/payables and stock, check journal balance, then make a secure backup after stopping the server. Keep the archive off the shop computer too.
 
 Only the owner is provisioned in this version. Do not share the owner password with staff who should have restricted access. Stock/cost or accounting changes cannot be deleted through the application; reasons and audit records make changes traceable.
+
+
+### BOX counts and decimal weights
+
+Weight (kg) accepts up to three decimal places, such as 1.250 kg. The separate
+box count is a whole number (0, 1, 2, ...). BOX pricing still uses the actual
+kilograms; a fractional box count is rejected before adding the item. Switching
+price tiers clears the old box count. Retail and bulk sales do not submit hidden
+box values. After updating, reload the app and retry an existing retail cart;
+its weights and prices are preserved.

@@ -25,7 +25,7 @@ import {
   SlidersHorizontal,
   Scale,
 } from "lucide-react";
-import { php, qty, lineAmount } from "../lib/money";
+import { php, qty, lineAmount, boxCount } from "../lib/money";
 import { readJson, checkoutError } from "../lib/http";
 import {
   validateCartLine,
@@ -261,7 +261,7 @@ export default function Shop() {
     }
     if (!cartChange()) return;
     try {
-      validateCartLine({ quantity: weight, price });
+      validateCartLine({ quantity: weight, price, tier, boxes });
     } catch (e) {
       setError((e as Error).message);
       return;
@@ -275,12 +275,13 @@ export default function Shop() {
         quantity: weight,
         tier,
         price,
-        boxes: Number(boxes),
+        boxes: tier === "box" ? boxCount(boxes) : 0,
         overrideReason: override,
       },
     ]);
     setSelected(null);
     setWeight("1.000");
+    setBoxes("0");
     setOverride("");
   }
   const total = cart.reduce(
@@ -290,6 +291,12 @@ export default function Shop() {
   async function checkout(action = "sale") {
     if (busy) return;
     if (!pendingCheckout.current) {
+      try {
+        cart.forEach(validateCartLine);
+      } catch (error) {
+        setError((error as Error).message);
+        return;
+      }
       if (!checkoutKey.current) checkoutKey.current = crypto.randomUUID();
       pendingCheckout.current = {
         cart,
@@ -303,7 +310,7 @@ export default function Shop() {
               productId,
               quantity,
               tier,
-              boxes,
+              boxes: tier === "box" ? boxCount(boxes) : 0,
               overrideReason,
               expectedPrice: price,
             }),
@@ -1165,8 +1172,12 @@ export default function Shop() {
                       </Field>
                       <Field label="Selling price tier">
                         <select
+                          aria-label="Selling price tier"
                           value={tier}
-                          onChange={(e) => setTier(e.target.value)}
+                          onChange={(e) => {
+                            setTier(e.target.value);
+                            setBoxes("0");
+                          }}
                         >
                           {[
                             ["retail", "RETAIL"],
@@ -1192,6 +1203,7 @@ export default function Shop() {
                             type="number"
                             min="0"
                             step="1"
+                            inputMode="numeric"
                             value={boxes}
                             onChange={(e) => setBoxes(e.target.value)}
                           />
