@@ -241,6 +241,27 @@ export function bluetoothPrinterName() {
     : "";
 }
 
+export type PrinterConnection = {
+  state: "connected" | "disconnected" | "selected" | "unsupported" | "unknown";
+  name: string;
+};
+/** A read-only view of the current local transport. Never pairs or reconnects. */
+export function printerConnectionStatus(): PrinterConnection {
+  if (typeof window === "undefined" || typeof navigator === "undefined")
+    return { state: "unknown", name: "" };
+  if (serialPort)
+    return {
+      state: serialPort.writable ? "connected" : "selected",
+      name: SERIAL_NAME,
+    };
+  if (device?.gatt?.connected && characteristic)
+    return { state: "connected", name: device.name || "Bluetooth printer" };
+  return {
+    state: !usesSerial() && bluetoothSupport() ? "unsupported" : "disconnected",
+    name: "",
+  };
+}
+
 // Windows and other desktops: the printer's Bluetooth serial (COM) link. It stays
 // remembered across reloads, and is only held open while a receipt is sending so
 // other programs can still use the printer.

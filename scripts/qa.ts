@@ -1,3 +1,4 @@
+import { verifyDeletion } from "./qa-deletion";
 import { chromium } from "@playwright/test";
 import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -235,6 +236,12 @@ async function main() {
     await page
       .getByRole("status")
       .filter({ hasText: "Connected: QA selected printer" })
+      .waitFor();
+    await page
+      .getByRole("button", {
+        name: "Printer connected: QA selected printer",
+        exact: true,
+      })
       .waitFor();
     await page.screenshot({
       path: "test-results/settings-printer-android.png",
@@ -606,6 +613,9 @@ async function main() {
     await page.evaluate(() => {
       (window as any).qaDevices["QA selected printer"].gatt.connected = false;
     });
+    await page
+      .getByRole("button", { name: "Printer not connected", exact: true })
+      .waitFor();
     await page
       .getByRole("status")
       .filter({ hasText: "No printer connected" })
@@ -1070,6 +1080,7 @@ async function main() {
       .getByRole("button", { name: "Close dialog", exact: true })
       .click();
     await page.emulateMedia({ reducedMotion: "no-preference" });
+    await verifyDeletion(page, context);
     assert.deepEqual(errors, []);
     console.log(
       "PASS: owner login, closed registration, authorization, CSRF, purchase/receive/transfer, tablet POS, decimal sale/change, receipt preview/reprint, expense, return, partial balances, all modules, tablet screenshots and 80mm PDF.",

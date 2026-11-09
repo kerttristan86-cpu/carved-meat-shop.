@@ -1,6 +1,7 @@
 import { php, qty } from "./money";
 type R = Record<string, any>;
 const labels: Record<string, string> = {
+  delete: "Record deleted",
   sale: "Sale completed",
   draft: "Draft saved",
   product: "Product saved",
@@ -23,8 +24,9 @@ export function auditDisplay(a: R, shop: R) {
   const input = a.data?.input || {},
     result = a.data?.result || {};
   const document = (shop.documents || []).find((d: R) => d.id === result.id);
-  const data = document?.data || result;
-  const reference = document?.number || result.number;
+  const removed = a.action === "delete" ? result.record : null;
+  const data = removed?.data || document?.data || result;
+  const reference = removed?.number || document?.number || result.number;
   const formattedReference = reference
     ? `${data.shop?.prefix || shop.settings?.prefix || "CV"}-${String(reference).padStart(6, "0")}`
     : "";
@@ -44,6 +46,10 @@ export function auditDisplay(a: R, shop: R) {
     "Name",
     a.action === "party" || a.action === "location" ? input.name : undefined,
   );
+  if (removed) {
+    add("Deleted record", removed.name || removed.code || removed.kind);
+    add("Record type", input.entity);
+  }
   add("Type", input.kind);
   add("Category", input.category);
   if (a.action === "product") {

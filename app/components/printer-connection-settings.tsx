@@ -1,38 +1,22 @@
 "use client";
 import { Toast } from "./notifications";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { usePrinterConnection } from "./printer-status";
 import { LoadingIndicator } from "./shared";
-import {
-  bluetoothPrinterName,
-  connectBluetoothPrinter,
-} from "../../lib/thermal-printer";
+import { connectBluetoothPrinter } from "../../lib/thermal-printer";
 
 export default function PrinterConnectionSettings() {
-  const [connection, setConnection] = useState(bluetoothPrinterName);
+  const connection = usePrinterConnection();
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    let active = true;
-    const update = () => {
-      if (active) setConnection(bluetoothPrinterName());
-    };
-    // Read local connection state only; no Bluetooth chooser or network requests.
-    const timer = window.setInterval(update, 1500);
-    return () => {
-      active = false;
-      window.clearInterval(timer);
-    };
-  }, []);
 
   async function connect() {
     setConnecting(true);
     setError("");
     try {
       // Keep the chooser directly in the button gesture, as Android requires.
-      setConnection(await connectBluetoothPrinter());
+      await connectBluetoothPrinter();
     } catch (reason) {
-      setConnection(bluetoothPrinterName());
       setError(
         reason instanceof Error
           ? reason.message
@@ -47,12 +31,18 @@ export default function PrinterConnectionSettings() {
     <div>
       <h3>Receipt printer</h3>
       <p role="status" aria-live="polite">
-        {connection ? `Connected: ${connection}` : "No printer connected"}
+        {connection.state === "connected"
+          ? `Connected: ${connection.name}`
+          : connection.state === "selected"
+            ? "Printer selected. Connection is checked when printing."
+            : connection.state === "unsupported"
+              ? "Direct Bluetooth unavailable. Use system print."
+              : "No printer connected"}
       </p>
       <button disabled={connecting} onClick={connect}>
         {connecting ? (
           <LoadingIndicator label="Connecting..." inline />
-        ) : connection ? (
+        ) : connection.name ? (
           "Change printer"
         ) : (
           "Connect printer"

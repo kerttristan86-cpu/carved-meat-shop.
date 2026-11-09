@@ -2017,3 +2017,44 @@ button {
     opacity: 1 !important;
   }
 }
+
+button.danger {
+  color: #a82216;
+  border-color: #edc7c2;
+  background: #fff8f7;
+}
+button.danger:hover:not(:disabled) {
+  background: #ffebe8;
+  border-color: #ce655a;
+}
+.location-management {
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+}
+.location-management .row-actions {
+  margin: 8px 0;
+  justify-content: space-between;
+}
+
+.cart-line button.danger {
+  min-width: 78px;
+  flex-shrink: 0;
+  padding: 7px;
+}
+
+button.printer-status {
+  min-height: 36px;
+  padding: 6px 8px;
+  border-color: transparent;
+  background: transparent;
+  max-width: min(420px, 50vw);
+  font-weight: 500;
+}
+.printer-status span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.printer-status i {
+  flex-shrink: 0;
+}

@@ -1,3 +1,4 @@
+import { deleteUnusedRecord } from "./record-deletion";
 import { createHash, randomUUID } from "node:crypto";
 import { readTransaction, type Database, type Queryable } from "./postgres";
 import { z } from "zod";
@@ -23,6 +24,16 @@ async function one(db: DB, sql: string, args: any[] = []) {
 }
 async function doc(db: DB, key: string, kind?: string) {
   const d = await one(db, "SELECT * FROM documents WHERE id=$1", [key]);
+  if (
+    (
+      await rows(
+        db,
+        "SELECT id FROM documents WHERE kind='recordDeletion' AND data->>'targetId'=$1 LIMIT 1",
+        [key],
+      )
+    ).length
+  )
+    throw new Error("This record was deleted. Refresh the list.");
   if (kind && d.kind !== kind) throw new Error("Wrong document type");
   return d;
 }
@@ -134,7 +145,9 @@ export async function execute(
       return old.result;
     }
     let result: Row;
-    if (action === "product") {
+    if (action === "delete") {
+      result = await deleteUnusedRecord(tx, input);
+    } else if (action === "product") {
       const unit = z.enum(["kg", "service"]).parse(input.unit);
       const prices: Row = {};
       for (const tier of ["retail", "bulk", "box"])
@@ -846,7 +859,7 @@ export async function snapshot(db: Database, from?: string, to?: string) {
       locations = await rows(tx, "SELECT * FROM locations ORDER BY name"),
       documents = await rows(
         tx,
-        "SELECT * FROM documents ORDER BY number DESC",
+        "SELECT d.* FROM documents d WHERE NOT EXISTS (SELECT 1 FROM documents deleted WHERE deleted.kind='recordDeletion' AND deleted.data->>'targetId'=d.id) ORDER BY d.number DESC",
       );
     const movements = await rows(
         tx,
