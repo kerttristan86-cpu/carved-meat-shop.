@@ -1,4 +1,5 @@
 "use client";
+import { Toast } from "./notifications";
 import { useEffect, useState } from "react";
 import { LoadingIndicator } from "./shared";
 import {
@@ -57,11 +58,7 @@ export default function PrinterConnectionSettings() {
           "Connect printer"
         )}
       </button>
-      {error && (
-        <p role="alert" className="error">
-          {error}
-        </p>
-      )}
+      <Toast message={error} tone="error" onDismiss={() => setError("")} />
       <p>
         Connect the printer on this phone or tablet. New POS sales print
         automatically while it is connected. Saved receipts print when you tap

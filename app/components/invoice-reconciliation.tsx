@@ -1,4 +1,5 @@
 "use client";
+import { Toast } from "./notifications";
 import { useRef, useState } from "react";
 import { reconcileMonth, manilaDay } from "../../lib/invoice-reconciliation";
 import { php } from "../../lib/money";
@@ -254,11 +255,11 @@ export default function InvoiceReconciliation({
             <p>
               {number(sale, s.settings)} · actual sale {php(sale.data.total)}
             </p>
-            {error && (
-              <div role="alert" className="error">
-                {error}
-              </div>
-            )}
+            <Toast
+              message={error}
+              tone="error"
+              onDismiss={() => setError("")}
+            />
             {[
               ["invoiceNumber", "Official invoice number", "text"],
               ["invoiceDate", "Official invoice date", "date"],

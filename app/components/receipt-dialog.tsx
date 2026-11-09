@@ -1,4 +1,5 @@
 "use client";
+import { Toast } from "./notifications";
 import { useEffect, useState } from "react";
 import { Printer, X } from "lucide-react";
 import { php, qty } from "../../lib/money";
@@ -30,6 +31,7 @@ export default function ReceiptDialog({
   /** A sale just saved at checkout prints by itself. Reprints stay manual. */
   freshSale?: boolean;
 }) {
+  const [messageTone, setMessageTone] = useState<"info" | "error">("info");
   const [message, setMessage] = useState(""),
     [slip, setSlip] = useState(false),
     [operation, setOperation] = useState<
@@ -48,6 +50,7 @@ export default function ReceiptDialog({
   const settings = d.data.shop || s;
   async function autoPrint(name: string) {
     if (!claimAutoPrint(d.id)) return;
+    setMessageTone("info");
     setOperation("Printing…");
     setMessage(`Printing on ${name}…`);
     try {
@@ -56,6 +59,7 @@ export default function ReceiptDialog({
         `Receipt sent to ${name}. Check the paper. To print another copy, tap Print receipt.`,
       );
     } catch (e) {
+      setMessageTone("error");
       setMessage((e as Error).message);
     } finally {
       setOperation("");
@@ -76,10 +80,12 @@ export default function ReceiptDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   async function connect() {
+    setMessageTone("info");
     setOperation("Connecting…");
     try {
       const name = await connectBluetoothPrinter();
       setConnection(name);
+      setMessageTone("info");
       setOperation("");
       if (freshSale) await autoPrint(name);
       else
@@ -87,6 +93,7 @@ export default function ReceiptDialog({
           `Connected to ${name}. New sales will now print by themselves. Tap Print receipt to reprint this one.`,
         );
     } catch (e) {
+      setMessageTone("error");
       setConnection(bluetoothPrinterName());
       setMessage((e as Error).message);
     } finally {
@@ -94,6 +101,7 @@ export default function ReceiptDialog({
     }
   }
   async function saveImage() {
+    setMessageTone("info");
     setOperation("Preparing image…");
     try {
       const canvas = await receiptCanvas(
@@ -107,12 +115,14 @@ export default function ReceiptDialog({
         "Receipt image saved. Open it in your compatible printer app to print. No new sale was posted.",
       );
     } catch (e) {
+      setMessageTone("error");
       setMessage((e as Error).message);
     } finally {
       setOperation("");
     }
   }
   async function print() {
+    setMessageTone("info");
     setOperation("Printing…");
     try {
       if (connection) {
@@ -130,6 +140,7 @@ export default function ReceiptDialog({
         "Print dialog requested. Confirm the physical output; this app cannot verify printing.",
       );
     } catch (e) {
+      setMessageTone("error");
       setMessage((e as Error).message);
     } finally {
       setOperation("");
@@ -243,10 +254,11 @@ export default function ReceiptDialog({
       </div>
       <div className="receipt-tools bottom" aria-busy={busy}>
         {busy && <LoadingIndicator label={operation} />}
-        <p role="status">
-          {message ||
-            "80 mm layout · monochrome thermal preview. Physical printer compatibility is unverified."}
-        </p>
+        <Toast
+          message={busy ? "" : message}
+          tone={messageTone}
+          onDismiss={() => setMessage("")}
+        />
         <button disabled={busy} onClick={() => setSlip((v) => !v)}>
           {slip ? "View sales invoice" : "View internal order slip"}
         </button>

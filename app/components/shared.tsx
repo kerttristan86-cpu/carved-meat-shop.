@@ -119,11 +119,14 @@ export function Modal({
     document.body.style.overflow = "hidden";
     const focusable = () =>
       Array.from(
-        node.querySelectorAll<HTMLElement>(
+        document.querySelectorAll<HTMLElement>(
           "button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),summary,[tabindex]:not([tabindex='-1'])",
         ),
       ).filter(
-        (el) => el.getClientRects().length && !el.closest("[hidden],[inert]"),
+        (el) =>
+          (node.contains(el) || el.closest("[data-toast]")) &&
+          el.getClientRects().length > 0 &&
+          !el.closest("[hidden],[inert]"),
       );
     (focusable()[0] || node).focus();
     const keydown = (event: KeyboardEvent) => {
@@ -143,21 +146,30 @@ export function Modal({
       if (
         event.shiftKey &&
         (document.activeElement === first ||
-          !node.contains(document.activeElement))
+          (!node.contains(document.activeElement) &&
+            !(document.activeElement as HTMLElement | null)?.closest(
+              "[data-toast]",
+            )))
       ) {
         event.preventDefault();
         last.focus();
       } else if (
         !event.shiftKey &&
         (document.activeElement === last ||
-          !node.contains(document.activeElement))
+          (!node.contains(document.activeElement) &&
+            !(document.activeElement as HTMLElement | null)?.closest(
+              "[data-toast]",
+            )))
       ) {
         event.preventDefault();
         first.focus();
       }
     };
     const focusin = (event: FocusEvent) => {
-      if (!node.contains(event.target as Node))
+      if (
+        !node.contains(event.target as Node) &&
+        !(event.target as HTMLElement)?.closest("[data-toast]")
+      )
         (focusable()[0] || node).focus();
     };
     document.addEventListener("keydown", keydown);

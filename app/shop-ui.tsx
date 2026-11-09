@@ -1,4 +1,5 @@
 "use client";
+import { Toast } from "./components/notifications";
 import { useEffect, useRef, useState } from "react";
 import {
   LayoutDashboard,
@@ -482,11 +483,7 @@ export default function Shop() {
           <div className="eyebrow">YOUR DAILY OPERATIONS, TOGETHER</div>
           <h1>Welcome to the shop.</h1>
           <p>Sign in to manage sales, stock, and accounts.</p>
-          {error && (
-            <p role="alert" className="error">
-              {error}
-            </p>
-          )}
+          <Toast message={error} tone="error" onDismiss={() => setError("")} />
           <form onSubmit={signIn}>
             <Field label="Owner email">
               <input
@@ -809,54 +806,53 @@ export default function Shop() {
               )}
             </div>
           </div>
-          {error && (
-            <div className="error" role="alert">
-              {error}
-              <button aria-label="Dismiss error" onClick={() => setError("")}>
-                <X size={16} />
-              </button>
-            </div>
+          {!modal && (
+            <Toast
+              message={error}
+              tone="error"
+              onDismiss={() => setError("")}
+            />
           )}
-          {notice && (
-            <div className="success" role="status">
-              <Check size={18} />
-              {notice}
-            </div>
-          )}
+          <Toast
+            message={notice}
+            tone="success"
+            onDismiss={() => setNotice("")}
+          />
           {pendingOperation && !busy && (
-            <div className="info" role="status">
-              <div>
-                <strong>A record is awaiting confirmation.</strong>
-                <p>
-                  Confirm the original {pendingOperation.action} before starting
-                  another operation. Its retry key is preserved on this device.
-                </p>
-              </div>
-              <button
-                onClick={async () => {
-                  if (
-                    pendingOperation.action === "sale" ||
-                    pendingOperation.action === "draft"
-                  ) {
-                    await checkout(pendingOperation.action);
-                    return;
-                  }
-                  try {
-                    await mutate(
-                      pendingOperation.action,
-                      pendingOperation.data,
-                      pendingOperation.key,
-                    );
-                    setModal(null);
-                    setNotice("Original record confirmed. It was posted once.");
-                  } catch (e) {
-                    setError((e as Error).message);
-                  }
-                }}
-              >
-                Confirm pending record
-              </button>
-            </div>
+            <Toast
+              persistent
+              message="A record is awaiting confirmation. Confirm the original record before starting another operation."
+              action={
+                <>
+                  <button
+                    onClick={async () => {
+                      if (
+                        pendingOperation.action === "sale" ||
+                        pendingOperation.action === "draft"
+                      ) {
+                        await checkout(pendingOperation.action);
+                        return;
+                      }
+                      try {
+                        await mutate(
+                          pendingOperation.action,
+                          pendingOperation.data,
+                          pendingOperation.key,
+                        );
+                        setModal(null);
+                        setNotice(
+                          "Original record confirmed. It was posted once.",
+                        );
+                      } catch (e) {
+                        setError((e as Error).message);
+                      }
+                    }}
+                  >
+                    Confirm pending record
+                  </button>
+                </>
+              }
+            />
           )}
           {(page === "Overview" || page === "Accounting") && (
             <div className="range">
@@ -2310,11 +2306,7 @@ export default function Shop() {
               <X size={20} />
             </button>
           </div>
-          {error && (
-            <div className="error" role="alert">
-              {error}
-            </div>
-          )}
+          <Toast message={error} tone="error" onDismiss={() => setError("")} />
           {modal.kind === "history" ? (
             <div className="settings-body">
               <h3>{modal.party.name}</h3>

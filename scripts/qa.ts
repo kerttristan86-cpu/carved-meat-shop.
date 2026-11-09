@@ -313,6 +313,27 @@ async function main() {
       0,
       "Invalid box counts must be rejected before adding to the cart",
     );
+    assert.equal(
+      await page
+        .locator(".toast-error")
+        .filter({ hasText: "Box count must be a whole number" })
+        .count(),
+      1,
+    );
+    assert.equal(
+      await page.locator(".error[role=alert]").count(),
+      0,
+      "Errors use toasts rather than inline banners",
+    );
+    await page.screenshot({
+      path: "test-results/pos-error-toast.png",
+      fullPage: true,
+    });
+    await page
+      .getByRole("button", { name: "Dismiss error", exact: true })
+      .click();
+    await page.locator(".toast-error").waitFor({ state: "hidden" });
+
     await page.screenshot({
       path: "test-results/pos-box-count-validation.png",
       fullPage: true,
@@ -550,7 +571,7 @@ async function main() {
       .getByRole("button", { name: "Print receipt", exact: true })
       .click();
     await page
-      .getByRole("status")
+      .getByRole("alert")
       .filter({ hasText: "may be partial" })
       .waitFor();
     assert.equal(
@@ -788,7 +809,7 @@ async function main() {
     await page
       .getByRole("button", { name: "Save record", exact: true })
       .click();
-    await page.getByRole("dialog").getByRole("alert").waitFor();
+    await page.locator(".toast-error").waitFor();
     await page.getByRole("button", { name: "Close dialog" }).click();
     await page.reload({ waitUntil: "domcontentloaded" });
     await page
@@ -844,9 +865,11 @@ async function main() {
     );
     await page.keyboard.press("Shift+Tab");
     assert.equal(
-      await productDialog
-        .getByRole("button", { name: "Save record" })
-        .evaluate((el) => el === document.activeElement),
+      await page.evaluate(() =>
+        Boolean(
+          document.activeElement?.closest('[role="dialog"],[data-toast]'),
+        ),
+      ),
       true,
     );
     await page.keyboard.press("Tab");
