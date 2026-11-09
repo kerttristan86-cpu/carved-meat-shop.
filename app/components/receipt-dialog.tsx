@@ -196,7 +196,7 @@ export default function ReceiptDialog({
         <p>
           {number(d, settings)}
           <br />
-          {date(d.created_at)} · Asia/Manila
+          {date(d.created_at)} · Sta. Cruz, Laguna
           <br />
           Operator: Shop owner
           <br />
