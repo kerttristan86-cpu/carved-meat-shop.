@@ -190,7 +190,7 @@ export default function ReceiptDialog({
         {settings.contact && <p>{settings.contact}</p>}
         {settings.invoiceDetails && <p>{settings.invoiceDetails}</p>}
         <h4>
-          {slip ? "Internal order slip · not an invoice" : settings.heading}
+          {slip ? "Internal order slip · not an invoice" : "Request for payment"}
         </h4>
 
         <p>
@@ -247,9 +247,8 @@ export default function ReceiptDialog({
         <hr />
         <p>{settings.footer}</p>
         <p className="review-note">
-          Layout requires accountant review.
-          <br />
-          Not certified for statutory use.
+          This document is not valid for input tax. This is a request for payment.
+          This is not a sales invoice. Please ask for your sales invoice.
         </p>
       </div>
       <div className="receipt-tools bottom" aria-busy={busy}>
@@ -260,7 +259,7 @@ export default function ReceiptDialog({
           onDismiss={() => setMessage("")}
         />
         <button disabled={busy} onClick={() => setSlip((v) => !v)}>
-          {slip ? "View sales invoice" : "View internal order slip"}
+          {slip ? "View request for payment" : "View internal order slip"}
         </button>
         <label className="field" style={{ width: "100%" }}>
           <span>Print mode</span>
