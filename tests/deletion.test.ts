@@ -32,51 +32,30 @@ test("unused records delete once, with original details preserved in audit", asy
       s.audit.find((a) => a.action === "delete")!.data.result.record.name,
       "Unused product",
     );
+  } finally {
+    await db.close();
+  }
+});
+test("deletion is limited to products and protects products referenced by saved drafts", async () => {
+  const db = await testDatabase();
+  try {
     const party = await execute(
       db,
       "party",
-      { name: "Unused contact", kind: "customer" },
-      "party",
-      "owner",
-    );
-    await execute(
-      db,
-      "delete",
-      { entity: "party", id: party.id, reason: "Duplicate" },
-      "dp",
-      "owner",
-    );
-    const loc = await execute(
-      db,
-      "location",
-      { name: "Unused room" },
-      "loc",
-      "owner",
-    );
-    await execute(
-      db,
-      "delete",
-      { entity: "location", id: loc.id, reason: "Duplicate" },
-      "dl",
+      { name: "Keep contact", kind: "customer" },
+      "keep-party",
       "owner",
     );
     await assert.rejects(
       execute(
         db,
         "delete",
-        { entity: "location", id: "storage", reason: "Wrong" },
-        "default",
+        { entity: "party", id: party.id, reason: "Wrong scope" },
+        "dp",
         "owner",
       ),
-      /default location/i,
+      /products only/i,
     );
-  } finally {
-    await db.close();
-  }
-});
-test("draft deletion protects posted sales, referenced products and linked drafts", async () => {
-  const db = await testDatabase();
-  try {
     const p = await execute(
       db,
       "product",
@@ -90,61 +69,27 @@ test("draft deletion protects posted sales, referenced products and linked draft
       "p",
       "owner",
     );
-    const data = {
-      locationId: "freezer",
-      lines: [{ productId: p.id, quantity: "1", tier: "retail" }],
-      tendered: "100",
-    };
-    const draft = await execute(db, "draft", data, "draft", "owner");
+    await execute(
+      db,
+      "draft",
+      {
+        locationId: "freezer",
+        lines: [{ productId: p.id, quantity: "1", tier: "retail" }],
+      },
+      "draft",
+      "owner",
+    );
     await assert.rejects(
       execute(
         db,
         "delete",
-        { entity: "product", id: p.id, reason: "Unused" },
+        { entity: "product", id: p.id, reason: "Referenced" },
         "ref",
         "owner",
       ),
       /history|referenced/i,
     );
-    await execute(
-      db,
-      "delete",
-      { entity: "document", id: draft.id, reason: "Cancelled draft" },
-      "dd",
-      "owner",
-    );
-    const linked = await execute(db, "draft", data, "linked", "owner");
-    const sale = await execute(
-      db,
-      "sale",
-      { ...data, draftId: linked.id },
-      "sale",
-      "owner",
-    );
-    const before = await snapshot(db);
-    await assert.rejects(
-      execute(
-        db,
-        "delete",
-        { entity: "document", id: sale.id, reason: "Cancel" },
-        "sale-delete",
-        "owner",
-      ),
-      /posted|reversal/i,
-    );
-    await assert.rejects(
-      execute(
-        db,
-        "delete",
-        { entity: "document", id: linked.id, reason: "Cancel" },
-        "linked-delete",
-        "owner",
-      ),
-      /linked|posted/i,
-    );
-    const after = await snapshot(db);
-    assert.deepEqual(after.report, before.report);
-    assert.deepEqual(after.journals, before.journals);
+    assert.equal((await snapshot(db)).parties.length, 1);
   } finally {
     await db.close();
   }

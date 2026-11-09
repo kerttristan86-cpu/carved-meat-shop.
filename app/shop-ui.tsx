@@ -266,59 +266,16 @@ export default function Shop() {
   }
   const set = (key: string, value: any) =>
     setForm((f) => ({ ...f, [key]: value }));
-  function askDelete(entity: string, record: R, label: string) {
-    if (busy) return;
-    if ((entity === "cart" || entity === "cartItem") && !cartChange()) return;
-    setError("");
-    setDeletion({ entity, id: record.id, index: record.index, label });
-  }
-  function deleteButton(entity: string, record: R, label: string) {
-    return (
-      <button
-        type="button"
-        className="danger"
-        disabled={busy}
-        aria-label={`Delete ${label}`}
-        onClick={() => askDelete(entity, record, label)}
-      >
-        <Trash2 size={16} /> Delete
-      </button>
-    );
-  }
   async function confirmDeletion() {
     if (!deletion || busy) return;
     try {
-      if (deletion.entity === "cart" || deletion.entity === "cartItem") {
-        if (!cartChange()) return;
-        if (deletion.entity === "cart") {
-          setCart([]);
-          setTendered("");
-          setDraftId(undefined);
-          setCustomer("");
-          setSelected(null);
-        } else
-          setCart((lines) =>
-            lines.filter((_, index) => index !== deletion.index),
-          );
-        setNotice(
-          deletion.entity === "cart"
-            ? "Current order deleted. No saved sale was changed."
-            : "Item deleted from the current order.",
-        );
-      } else {
-        await mutate("delete", {
-          entity: deletion.entity,
-          id: deletion.id,
-          reason: "Deleted after confirmation",
-        });
-        if (deletion.entity === "document" && deletion.id === draftId) {
-          setDraftId(undefined);
-          setCart([]);
-          setTendered("");
-        }
-        setNotice("Record deleted.");
-      }
+      await mutate("delete", {
+        entity: "product",
+        id: deletion.id,
+        reason: "Product deleted after confirmation",
+      });
       setDeletion(null);
+      setNotice("Product deleted.");
     } catch (reason) {
       setError((reason as Error).message);
     }
@@ -1398,14 +1355,13 @@ export default function Shop() {
                           )}
                         </b>
                         <button
-                          className="danger"
-                          aria-label={`Delete ${l.name} from order`}
-                          disabled={busy}
-                          onClick={() =>
-                            askDelete("cartItem", { index: i }, l.name)
-                          }
+                          aria-label={`Remove ${l.name}`}
+                          onClick={() => {
+                            if (!cartChange()) return;
+                            setCart(cart.filter((_, n) => n !== i));
+                          }}
                         >
-                          <Trash2 size={16} /> Delete
+                          <Trash2 size={16} />
                         </button>
                       </div>
                     ))
@@ -1462,14 +1418,6 @@ export default function Shop() {
                   >
                     Save invoice draft
                   </button>
-                  <button
-                    type="button"
-                    className="danger wide"
-                    disabled={busy || !cart.length}
-                    onClick={() => askDelete("cart", {}, "current order")}
-                  >
-                    <Trash2 size={16} /> Delete current order
-                  </button>
                   <small className="cart-note">
                     Cart is kept on this device. Checkout needs a server
                     connection.
@@ -1506,21 +1454,6 @@ export default function Shop() {
                     <Plus size={16} /> Add location
                   </button>
                 </div>
-                {s.locations.some(
-                  (l: R) => !["storage", "freezer"].includes(l.id),
-                ) && (
-                  <details className="location-management">
-                    <summary>Manage locations</summary>
-                    {s.locations
-                      .filter((l: R) => !["storage", "freezer"].includes(l.id))
-                      .map((l: R) => (
-                        <div key={l.id} className="row-actions">
-                          <span>{l.name}</span>
-                          {deleteButton("location", l, l.name)}
-                        </div>
-                      ))}
-                  </details>
-                )}
                 <div className="table-wrap">
                   <table>
                     <thead>
@@ -1698,7 +1631,18 @@ export default function Shop() {
                           >
                             Edit
                           </button>
-                          {deleteButton("product", p, p.name)}
+                          <button
+                            type="button"
+                            className="danger"
+                            disabled={busy}
+                            aria-label={`Delete ${p.name}`}
+                            onClick={() => {
+                              setError("");
+                              setDeletion(p);
+                            }}
+                          >
+                            <Trash2 size={16} /> Delete
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -1764,12 +1708,6 @@ export default function Shop() {
                               >
                                 Receive stock
                               </button>
-                              {!d.received &&
-                                deleteButton(
-                                  "document",
-                                  d,
-                                  number(d, s.settings),
-                                )}
                               <button
                                 disabled={!d.balance}
                                 onClick={() =>
@@ -1869,20 +1807,12 @@ export default function Shop() {
                             <td>
                               <div className="row-actions">
                                 {d.kind === "draft" ? (
-                                  <>
-                                    <button
-                                      disabled={posted}
-                                      onClick={() => loadDraft(d)}
-                                    >
-                                      Open in POS
-                                    </button>
-                                    {!posted &&
-                                      deleteButton(
-                                        "document",
-                                        d,
-                                        number(d, s.settings),
-                                      )}
-                                  </>
+                                  <button
+                                    disabled={posted}
+                                    onClick={() => loadDraft(d)}
+                                  >
+                                    Open in POS
+                                  </button>
                                 ) : (
                                   <>
                                     <button onClick={() => setReceipt(d)}>
@@ -2030,7 +1960,6 @@ export default function Shop() {
                           <button onClick={() => open("history", { party: p })}>
                             View history
                           </button>
-                          {deleteButton("party", p, p.name)}
                         </td>
                       </tr>
                     ))}
@@ -2861,7 +2790,7 @@ export default function Shop() {
           onClose={() => setDeletion(null)}
         >
           <div className="panel-heading">
-            <h2>Delete {deletion.label}?</h2>
+            <h2>Delete {deletion.name}?</h2>
             <button
               disabled={busy}
               aria-label="Close delete confirmation"
@@ -2872,9 +2801,9 @@ export default function Shop() {
           </div>
           <div className="settings-body">
             <p>
-              {deletion.entity === "cart" || deletion.entity === "cartItem"
-                ? "This removes it from the current order on this device. Saved sales are unchanged."
-                : "This cannot be undone. Records linked to stock or posted transactions are protected. A record of this deletion will remain in audit history."}
+              Delete this product from the catalog? Products with stock or saved
+              transaction history are protected. This deletion stays in audit
+              history.
             </p>
             <div className="row-actions">
               <button disabled={busy} onClick={() => setDeletion(null)}>
