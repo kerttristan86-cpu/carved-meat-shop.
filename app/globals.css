@@ -1006,6 +1006,42 @@ dl + .info {
   border: 1px solid #bddded;
   border-radius: 14px;
   box-shadow: 0 25px 100px #132d4038;
+  position: relative;
+}
+.loading-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: inherit;
+  font-weight: 650;
+}
+.loading-indicator svg {
+  animation: loading-spin 0.9s linear infinite;
+}
+.loading-indicator.inline {
+  gap: 6px;
+}
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  background: #102b4038;
+  backdrop-filter: blur(2px);
+}
+.loading-overlay .loading-indicator {
+  padding: 18px 22px;
+  border: 1px solid #bddded;
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 12px 40px #132d4030;
+}
+@keyframes loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .modal form {
   padding: 23px;
@@ -1781,5 +1817,11 @@ button {
   }
   .review-list label {
     flex-wrap: wrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-indicator svg {
+    animation: none;
   }
 }

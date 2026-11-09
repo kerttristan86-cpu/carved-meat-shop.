@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { LoadingIndicator } from "./shared";
 import {
   bluetoothPrinterName,
   connectBluetoothPrinter,
@@ -48,11 +49,13 @@ export default function PrinterConnectionSettings() {
         {connection ? `Connected: ${connection}` : "No printer connected"}
       </p>
       <button disabled={connecting} onClick={connect}>
-        {connecting
-          ? "Connecting…"
-          : connection
-            ? "Change printer"
-            : "Connect printer"}
+        {connecting ? (
+          <LoadingIndicator label="Connecting..." inline />
+        ) : connection ? (
+          "Change printer"
+        ) : (
+          "Connect printer"
+        )}
       </button>
       {error && (
         <p role="alert" className="error">

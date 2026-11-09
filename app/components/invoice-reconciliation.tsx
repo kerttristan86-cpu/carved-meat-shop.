@@ -2,7 +2,15 @@
 import { useRef, useState } from "react";
 import { reconcileMonth, manilaDay } from "../../lib/invoice-reconciliation";
 import { php } from "../../lib/money";
-import { Field, number, date, download, Pill } from "./shared";
+import {
+  Field,
+  number,
+  date,
+  download,
+  Pill,
+  Modal,
+  LoadingIndicator,
+} from "./shared";
 type R = Record<string, any>;
 export default function InvoiceReconciliation({
   state: s,
@@ -227,60 +235,60 @@ export default function InvoiceReconciliation({
         {!visible.length && <p>No sales match this view.</p>}
       </div>
       {sale && (
-        <div className="modal-backdrop">
-          <section
-            className="modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Link official invoice"
-          >
-            <div className="panel-heading">
-              <h2>Link official invoice</h2>
-              <button
-                autoFocus
-                aria-label="Close invoice link"
-                disabled={saving}
-                onClick={() => setSale(null)}
-              >
-                Close
-              </button>
-            </div>
-            <form onSubmit={save}>
-              <p>
-                {number(sale, s.settings)} · actual sale {php(sale.data.total)}
-              </p>
-              {error && (
-                <div role="alert" className="error">
-                  {error}
-                </div>
+        <Modal
+          busy={saving}
+          ariaLabel="Link official invoice"
+          onClose={() => !saving && setSale(null)}
+        >
+          <div className="panel-heading">
+            <h2>Link official invoice</h2>
+            <button
+              aria-label="Close invoice link"
+              disabled={saving}
+              onClick={() => setSale(null)}
+            >
+              Close
+            </button>
+          </div>
+          <form onSubmit={save}>
+            <p>
+              {number(sale, s.settings)} · actual sale {php(sale.data.total)}
+            </p>
+            {error && (
+              <div role="alert" className="error">
+                {error}
+              </div>
+            )}
+            {[
+              ["invoiceNumber", "Official invoice number", "text"],
+              ["invoiceDate", "Official invoice date", "date"],
+              ["invoiceAmount", "Official invoice amount (PHP)", "text"],
+              ["reason", "Reason / correction note", "text"],
+            ].map(([k, l, t]) => (
+              <Field label={l} key={k}>
+                <input
+                  required
+                  type={t}
+                  value={form[k] || ""}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, [k]: e.target.value }))
+                  }
+                />
+              </Field>
+            ))}
+            <p className="muted">
+              Reference only. Any difference from the sale amount remains
+              flagged. Corrections retain their history.
+            </p>
+            <button className="primary wide" disabled={saving}>
+              {saving ? (
+                <LoadingIndicator label="Saving…" inline />
+              ) : (
+                "Save invoice link"
               )}
-              {[
-                ["invoiceNumber", "Official invoice number", "text"],
-                ["invoiceDate", "Official invoice date", "date"],
-                ["invoiceAmount", "Official invoice amount (PHP)", "text"],
-                ["reason", "Reason / correction note", "text"],
-              ].map(([k, l, t]) => (
-                <Field label={l} key={k}>
-                  <input
-                    required
-                    type={t}
-                    value={form[k] || ""}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, [k]: e.target.value }))
-                    }
-                  />
-                </Field>
-              ))}
-              <p className="muted">
-                Reference only. Any difference from the sale amount remains
-                flagged. Corrections retain their history.
-              </p>
-              <button className="primary wide" disabled={saving}>
-                {saving ? "Saving…" : "Save invoice link"}
-              </button>
-            </form>
-          </section>
-        </div>
+            </button>
+          </form>
+        </Modal>
       )}
     </details>
   );

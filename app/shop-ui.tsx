@@ -46,6 +46,10 @@ import {
   Field,
   Empty,
   Pill,
+  LoadingIndicator,
+  LoadingOverlay,
+  LoadingScreen,
+  Modal,
 } from "./components/shared";
 type R = Record<string, any>;
 const nav = [
@@ -469,13 +473,7 @@ export default function Shop() {
       setBusy(false);
     }
   }
-  if (loading)
-    return (
-      <main className="login">
-        <img src="/carved-logo-transparent.png" alt="CARVED Meat Shop" />
-        <p>Opening your shop…</p>
-      </main>
-    );
+  if (loading) return <LoadingScreen />;
   if (login || !state)
     return (
       <main className="login">
@@ -507,7 +505,13 @@ export default function Shop() {
               />
             </Field>
             <button className="primary" disabled={busy}>
-              Sign in <ArrowRight size={18} />
+              {busy ? (
+                <LoadingIndicator label="Signing in…" inline />
+              ) : (
+                <>
+                  Sign in <ArrowRight size={18} />
+                </>
+              )}
             </button>
           </form>
           <small>
@@ -1366,7 +1370,11 @@ export default function Shop() {
                     onClick={() => checkout()}
                   >
                     <Check size={18} />
-                    {busy ? "Saving…" : "Complete sale"}
+                    {busy ? (
+                      <LoadingIndicator label="Saving..." inline />
+                    ) : (
+                      "Complete sale"
+                    )}
                   </button>
                   <button
                     className="wide"
@@ -2263,501 +2271,474 @@ export default function Shop() {
         </footer>
       </div>
       {modal && (
-        <div className="modal-backdrop">
-          <section
-            className="modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label={modal.kind}
-            tabIndex={-1}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") setModal(null);
-              if (e.key === "Tab") {
-                const nodes = e.currentTarget.querySelectorAll<HTMLElement>(
-                  "button,input,select,textarea,summary",
-                );
-                const first = nodes[0],
-                  last = nodes[nodes.length - 1];
-                if (e.shiftKey && document.activeElement === first) {
-                  e.preventDefault();
-                  last?.focus();
-                } else if (!e.shiftKey && document.activeElement === last) {
-                  e.preventDefault();
-                  first?.focus();
-                }
+        <Modal
+          ariaLabel={modal.kind}
+          busy={busy}
+          onClose={() => setModal(null)}
+        >
+          <div className="panel-heading">
+            <h2>
+              {
+                (
+                  {
+                    product: modal.product ? "Edit product" : "New product",
+                    party: "Customer / supplier",
+                    purchase: "New purchase order",
+                    receive: "Receive purchased stock",
+                    restock: "Restock product",
+                    transfer: "Transfer stock",
+                    adjust: "Count, spoilage & adjustment",
+                    expense: "Record expense",
+                    payment: "Customer payment",
+                    supplierPayment: "Supplier payment",
+                    return: "Linked return / reversal",
+                    settings: "Document settings",
+                    location: "Add stock location",
+                    history: "Transaction history",
+                    password: "Change owner password",
+                    documentLayouts: "Customer & accountant invoice templates",
+                    funds: "Record owner funds",
+                  } as R
+                )[modal.kind]
               }
-            }}
-          >
-            <div className="panel-heading">
-              <h2>
-                {
-                  (
-                    {
-                      product: modal.product ? "Edit product" : "New product",
-                      party: "Customer / supplier",
-                      purchase: "New purchase order",
-                      receive: "Receive purchased stock",
-                      restock: "Restock product",
-                      transfer: "Transfer stock",
-                      adjust: "Count, spoilage & adjustment",
-                      expense: "Record expense",
-                      payment: "Customer payment",
-                      supplierPayment: "Supplier payment",
-                      return: "Linked return / reversal",
-                      settings: "Document settings",
-                      location: "Add stock location",
-                      history: "Transaction history",
-                      password: "Change owner password",
-                      documentLayouts:
-                        "Customer & accountant invoice templates",
-                      funds: "Record owner funds",
-                    } as R
-                  )[modal.kind]
-                }
-              </h2>
-              <button
-                autoFocus
-                aria-label="Close dialog"
-                onClick={() => setModal(null)}
-              >
-                <X size={20} />
-              </button>
+            </h2>
+            <button
+              aria-label="Close dialog"
+              disabled={busy}
+              onClick={() => setModal(null)}
+            >
+              <X size={20} />
+            </button>
+          </div>
+          {error && (
+            <div className="error" role="alert">
+              {error}
             </div>
-            {error && (
-              <div className="error" role="alert">
-                {error}
-              </div>
-            )}
-            {modal.kind === "history" ? (
-              <div className="settings-body">
-                <h3>{modal.party.name}</h3>
-                {docs
-                  .filter((d) => d.party_id === modal.party.id)
-                  .map((d) => (
-                    <div className="history-row" key={d.id}>
-                      <strong>
-                        {d.kind} · {number(d, s.settings)}
-                      </strong>
-                      <span>
-                        {date(d.created_at)} ·{" "}
-                        {php(d.data.total || d.data.amount || 0)}
-                      </span>
-                    </div>
-                  ))}
-              </div>
-            ) : modal.kind === "password" ? (
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  setBusy(true);
-                  try {
-                    const r = await fetch("/api/auth/change-password", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        currentPassword: form.currentPassword,
-                        newPassword: form.newPassword,
-                        revokeOtherSessions: true,
-                      }),
-                    });
-                    const d = await r.json();
-                    if (!r.ok)
-                      throw new Error(d.message || "Password change failed");
-                    setModal(null);
-                    setNotice("Password changed. Other sessions revoked.");
-                  } catch (e) {
-                    setError((e as Error).message);
-                  } finally {
-                    setBusy(false);
-                  }
-                }}
-              >
-                {input("Current password", "currentPassword", "password")}
-                {input(
-                  "New password (12 characters minimum)",
-                  "newPassword",
-                  "password",
-                )}
-                <button disabled={busy} className="primary wide">
-                  Change password
-                </button>
-              </form>
-            ) : (
-              <form onSubmit={submit}>
-                {modal.kind === "product" && (
-                  <>
-                    {input(
-                      "Product code (optional)",
-                      "code",
-                      "text",
-                      false,
-                      modal.product
-                        ? "Leave blank to keep the current code"
-                        : "Leave blank to generate automatically",
+          )}
+          {modal.kind === "history" ? (
+            <div className="settings-body">
+              <h3>{modal.party.name}</h3>
+              {docs
+                .filter((d) => d.party_id === modal.party.id)
+                .map((d) => (
+                  <div className="history-row" key={d.id}>
+                    <strong>
+                      {d.kind} · {number(d, s.settings)}
+                    </strong>
+                    <span>
+                      {date(d.created_at)} ·{" "}
+                      {php(d.data.total || d.data.amount || 0)}
+                    </span>
+                  </div>
+                ))}
+            </div>
+          ) : modal.kind === "password" ? (
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setBusy(true);
+                try {
+                  const r = await fetch("/api/auth/change-password", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      currentPassword: form.currentPassword,
+                      newPassword: form.newPassword,
+                      revokeOtherSessions: true,
+                    }),
+                  });
+                  const d = await r.json();
+                  if (!r.ok)
+                    throw new Error(d.message || "Password change failed");
+                  setModal(null);
+                  setNotice("Password changed. Other sessions revoked.");
+                } catch (e) {
+                  setError((e as Error).message);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              {input("Current password", "currentPassword", "password")}
+              {input(
+                "New password (12 characters minimum)",
+                "newPassword",
+                "password",
+              )}
+              <button disabled={busy} className="primary wide">
+                Change password
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={submit}>
+              {modal.kind === "product" && (
+                <>
+                  {input(
+                    "Product code (optional)",
+                    "code",
+                    "text",
+                    false,
+                    modal.product
+                      ? "Leave blank to keep the current code"
+                      : "Leave blank to generate automatically",
+                  )}
+                  {input("Product name", "name")}
+                  {input("Category", "category")}
+                  {input("Brand (optional)", "brand", "text", false)}
+                  {input("Cut (optional)", "cut", "text", false)}
+                  {select("Unit", "unit", [
+                    { id: "kg", name: "Kilogram" },
+                    { id: "service", name: "Service units" },
+                  ])}
+                  {form.unit === "service" &&
+                    input(
+                      "Service charge unit (confirm with shop)",
+                      "serviceUnit",
                     )}
-                    {input("Product name", "name")}
-                    {input("Category", "category")}
-                    {input("Brand (optional)", "brand", "text", false)}
-                    {input("Cut (optional)", "cut", "text", false)}
-                    {select("Unit", "unit", [
-                      { id: "kg", name: "Kilogram" },
-                      { id: "service", name: "Service units" },
-                    ])}
-                    {form.unit === "service" &&
-                      input(
-                        "Service charge unit (confirm with shop)",
-                        "serviceUnit",
-                      )}
-                    {["retail", "bulk", "box"].map((t) => (
-                      <div key={t}>
-                        {input(
-                          `${t === "bulk" ? "5 KG UP" : t.toUpperCase()} · PHP per ${form.unit === "service" ? "unit" : "kg"} (blank = unavailable)`,
-                          t,
-                          "text",
-                          false,
-                        )}
-                      </div>
-                    ))}
-                    {input(
-                      "Low stock threshold (kg)",
-                      "lowStock",
-                      "text",
-                      false,
-                    )}
-                    <label className="checkbox">
-                      <input
-                        type="checkbox"
-                        checked={form.active !== false}
-                        onChange={(e) => set("active", e.target.checked)}
-                      />{" "}
-                      Active for sale
-                    </label>
-                  </>
-                )}
-                {modal.kind === "party" && (
-                  <>
-                    {input("Name", "name")}
-                    {select("Type", "kind", [
-                      { id: "customer", name: "Customer" },
-                      { id: "supplier", name: "Supplier" },
-                    ])}
-                    {input("Contact", "contact", "text", false)}
-                    {input("Address", "address", "text", false)}
-                  </>
-                )}
-                {modal.kind === "location" && input("Location name", "name")}
-                {modal.kind === "purchase" && (
-                  <>
-                    {select("Supplier", "partyId", suppliers)}
-                    {input("Supplier reference", "reference", "text", false)}
-                    {(form.lines || []).map((line: R, index: number) => {
-                      const update = (key: string, value: string) =>
-                        set(
-                          "lines",
-                          form.lines.map((l: R, i: number) =>
-                            i === index ? { ...l, [key]: value } : l,
-                          ),
-                        );
-                      return (
-                        <section className="purchase-line" key={index}>
-                          <h3>Purchase line {index + 1}</h3>
-                          <Field label="Product">
-                            <select
-                              required
-                              value={line.productId}
-                              onChange={(e) =>
-                                update("productId", e.target.value)
-                              }
-                            >
-                              <option value="">Select product</option>
-                              {products
-                                .filter((p) => p.unit === "kg")
-                                .map((p) => (
-                                  <option key={p.id} value={p.id}>
-                                    {p.name}
-                                  </option>
-                                ))}
-                            </select>
-                          </Field>
-                          <Field label="Ordered actual weight (kg)">
-                            <input
-                              required
-                              value={line.quantity}
-                              onChange={(e) =>
-                                update("quantity", e.target.value)
-                              }
-                            />
-                          </Field>
-                          <Field label="Supplier cost (PHP/kg)">
-                            <input
-                              required
-                              value={line.cost}
-                              onChange={(e) => update("cost", e.target.value)}
-                            />
-                          </Field>
-                          <Field label="Box count (optional)">
-                            <input
-                              type="number"
-                              min="0"
-                              step="1"
-                              value={line.boxes}
-                              onChange={(e) => update("boxes", e.target.value)}
-                            />
-                          </Field>
-                          {form.lines.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                set(
-                                  "lines",
-                                  form.lines.filter(
-                                    (_: R, i: number) => i !== index,
-                                  ),
-                                )
-                              }
-                            >
-                              Remove line
-                            </button>
-                          )}
-                        </section>
-                      );
-                    })}
-                    <button
-                      type="button"
-                      className="wide"
-                      onClick={() =>
-                        set("lines", [
-                          ...form.lines,
-                          { productId: "", quantity: "", cost: "", boxes: "0" },
-                        ])
-                      }
-                    >
-                      <Plus size={17} /> Add purchase line
-                    </button>
-                    <p className="muted">
-                      Orders do not increase stock. Receive actual weights after
-                      delivery. Each line can be received in partial deliveries.
-                    </p>
-                  </>
-                )}
-                {modal.kind === "restock" && (
-                  <>
-                    <h3 style={{ marginBottom: 16 }}>{modal.product.name}</h3>
-                    {select("Supplier", "partyId", suppliers)}
-                    {locationSelect("locationId", "freezer")}
-                    {input("Add stock (kg)", "quantity")}
-                    {input("Supplier cost (PHP/kg)", "cost")}
-                    <p className="muted">
-                      Adds the entered kg to existing stock. The supplier
-                      balance is recorded under Purchases; supplier payment can
-                      be recorded there.
-                    </p>
-                  </>
-                )}
-                {modal.kind === "receive" && (
-                  <>
-                    {select(
-                      "Purchase line",
-                      "index",
-                      modal.document.data.lines.map((l: R, i: number) => ({
-                        id: String(i),
-                        name: `${l.name} · ordered ${qty(l.quantity)} kg`,
-                      })),
-                      "id",
-                      "name",
-                      "0",
-                    )}
-                    {locationSelect("locationId", "storage")}
-                    {input("Actual weight received now (kg)", "quantity")}
-                    {input("Boxes received now", "boxes", "number", false)}
-                    <p className="muted">
-                      Partial receipts are tracked. The server prevents
-                      receiving more than ordered.
-                    </p>
-                  </>
-                )}
-                {modal.kind === "transfer" && (
-                  <>
-                    {productSelect()}
-                    {select("From location", "from", s.locations)}
-                    {select("To location", "to", s.locations)}
-                    {input("Weight to transfer (kg)", "quantity")}
-                    {input("Reason", "reason")}
-                  </>
-                )}
-                {modal.kind === "adjust" && (
-                  <>
-                    {productSelect()}
-                    {locationSelect("locationId", "storage")}
-                    {select(
-                      "Adjustment kind",
-                      "kind",
-                      [
-                        {
-                          id: "opening",
-                          name: "Opening inventory (before any movements)",
-                        },
-                        { id: "count", name: "Physical count (set actual kg)" },
-                        { id: "spoilage", name: "Spoilage (remove kg)" },
-                        {
-                          id: "adjustment",
-                          name: "Positive stock adjustment (add kg)",
-                        },
-                      ],
-                      "id",
-                      "name",
-                      "count",
-                    )}
-                    {input(
-                      form.kind === "count" || form.kind === "opening"
-                        ? "Actual counted stock (kg)"
-                        : "Quantity (kg)",
-                      "quantity",
-                    )}
-                    {form.kind !== "spoilage" &&
-                      input(
-                        "Cost of additional stock (PHP/kg, if increasing)",
-                        "cost",
+                  {["retail", "bulk", "box"].map((t) => (
+                    <div key={t}>
+                      {input(
+                        `${t === "bulk" ? "5 KG UP" : t.toUpperCase()} · PHP per ${form.unit === "service" ? "unit" : "kg"} (blank = unavailable)`,
+                        t,
                         "text",
                         false,
                       )}
-                    {input("Reason / count reference", "reason")}
-                  </>
-                )}
-                {modal.kind === "expense" && (
-                  <>
-                    {input("Expense date", "date", "date")}
-                    {input("Category", "category")}
-                    {input("Payee", "payee")}
-                    {input("Amount (PHP)", "amount")}
-                    {select(
-                      "Paid from",
-                      "paymentAccount",
-                      [
-                        { id: "Cash", name: "Cash" },
-                        { id: "Bank", name: "Bank" },
-                      ],
-                      "id",
-                      "name",
-                      "Cash",
-                    )}
-                    {input("Notes", "notes", "text", false)}
-                    <Field label="Optional receipt attachment · PDF / PNG / JPEG, up to 5 MB">
-                      <input
-                        type="file"
-                        accept="application/pdf,image/png,image/jpeg"
-                        onChange={(e) =>
-                          setAttachment(e.target.files?.[0] || null)
-                        }
-                      />
-                    </Field>
-                  </>
-                )}
-                {modal.kind === "funds" && (
-                  <>
-                    {select(
-                      "Receiving account",
-                      "account",
-                      [
-                        { id: "Cash", name: "Cash" },
-                        { id: "Bank", name: "Bank" },
-                      ],
-                      "id",
-                      "name",
-                      "Cash",
-                    )}
-                    {input("Amount (PHP)", "amount")}
-                    {input("Reason / opening cash reference", "reason")}
-                    <p className="muted">
-                      Owner funding increases cash or bank and owner capital. It
-                      is not sales revenue.
-                    </p>
-                  </>
-                )}
-                {(modal.kind === "payment" ||
-                  modal.kind === "supplierPayment") && (
-                  <>
-                    <div className="info">
-                      Outstanding balance: {php(modal.document.balance)}
                     </div>
-                    {input("Payment amount (PHP)", "amount")}
-                    {modal.kind === "payment" &&
-                      input("Cash tendered (PHP)", "tendered", "text", false)}
-                  </>
-                )}
-                {modal.kind === "return" && (
-                  <>
-                    {select(
-                      "Original sale line",
-                      "index",
-                      modal.document.data.lines.map((l: R, i: number) => ({
-                        id: String(i),
-                        name: `${l.name} · ${qty(l.quantity)} ${l.unit === "kg" ? "kg" : "units"}`,
-                      })),
-                      "id",
-                      "name",
-                      "0",
-                    )}
-                    {input("Quantity to return", "quantity")}
-                    {input("Reason for return / reversal", "reason")}
-                    <label className="checkbox">
-                      <input
-                        type="checkbox"
-                        checked={form.restock === true}
-                        onChange={(e) => set("restock", e.target.checked)}
-                      />{" "}
-                      Return physical meat to original location
-                    </label>
-                    <p className="muted">
-                      Unpaid balances are reduced first. Any remainder is a cash
-                      refund. To reverse a whole sale, return each line in full.
-                      Posted history stays visible.
-                    </p>
-                  </>
-                )}
-                {modal.kind === "settings" && (
-                  <>
-                    {input("Business name", "name")}
-                    {input("Address", "address", "text", false)}
-                    {input("Contact", "contact", "text", false)}
-                    {input("Invoice heading", "heading")}
-                    {input(
-                      "Additional invoice fields / registration details (accountant reviewed)",
-                      "invoiceDetails",
+                  ))}
+                  {input("Low stock threshold (kg)", "lowStock", "text", false)}
+                  <label className="checkbox">
+                    <input
+                      type="checkbox"
+                      checked={form.active !== false}
+                      onChange={(e) => set("active", e.target.checked)}
+                    />{" "}
+                    Active for sale
+                  </label>
+                </>
+              )}
+              {modal.kind === "party" && (
+                <>
+                  {input("Name", "name")}
+                  {select("Type", "kind", [
+                    { id: "customer", name: "Customer" },
+                    { id: "supplier", name: "Supplier" },
+                  ])}
+                  {input("Contact", "contact", "text", false)}
+                  {input("Address", "address", "text", false)}
+                </>
+              )}
+              {modal.kind === "location" && input("Location name", "name")}
+              {modal.kind === "purchase" && (
+                <>
+                  {select("Supplier", "partyId", suppliers)}
+                  {input("Supplier reference", "reference", "text", false)}
+                  {(form.lines || []).map((line: R, index: number) => {
+                    const update = (key: string, value: string) =>
+                      set(
+                        "lines",
+                        form.lines.map((l: R, i: number) =>
+                          i === index ? { ...l, [key]: value } : l,
+                        ),
+                      );
+                    return (
+                      <section className="purchase-line" key={index}>
+                        <h3>Purchase line {index + 1}</h3>
+                        <Field label="Product">
+                          <select
+                            required
+                            value={line.productId}
+                            onChange={(e) =>
+                              update("productId", e.target.value)
+                            }
+                          >
+                            <option value="">Select product</option>
+                            {products
+                              .filter((p) => p.unit === "kg")
+                              .map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.name}
+                                </option>
+                              ))}
+                          </select>
+                        </Field>
+                        <Field label="Ordered actual weight (kg)">
+                          <input
+                            required
+                            value={line.quantity}
+                            onChange={(e) => update("quantity", e.target.value)}
+                          />
+                        </Field>
+                        <Field label="Supplier cost (PHP/kg)">
+                          <input
+                            required
+                            value={line.cost}
+                            onChange={(e) => update("cost", e.target.value)}
+                          />
+                        </Field>
+                        <Field label="Box count (optional)">
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={line.boxes}
+                            onChange={(e) => update("boxes", e.target.value)}
+                          />
+                        </Field>
+                        {form.lines.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              set(
+                                "lines",
+                                form.lines.filter(
+                                  (_: R, i: number) => i !== index,
+                                ),
+                              )
+                            }
+                          >
+                            Remove line
+                          </button>
+                        )}
+                      </section>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    className="wide"
+                    onClick={() =>
+                      set("lines", [
+                        ...form.lines,
+                        { productId: "", quantity: "", cost: "", boxes: "0" },
+                      ])
+                    }
+                  >
+                    <Plus size={17} /> Add purchase line
+                  </button>
+                  <p className="muted">
+                    Orders do not increase stock. Receive actual weights after
+                    delivery. Each line can be received in partial deliveries.
+                  </p>
+                </>
+              )}
+              {modal.kind === "restock" && (
+                <>
+                  <h3 style={{ marginBottom: 16 }}>{modal.product.name}</h3>
+                  {select("Supplier", "partyId", suppliers)}
+                  {locationSelect("locationId", "freezer")}
+                  {input("Add stock (kg)", "quantity")}
+                  {input("Supplier cost (PHP/kg)", "cost")}
+                  <p className="muted">
+                    Adds the entered kg to existing stock. The supplier balance
+                    is recorded under Purchases; supplier payment can be
+                    recorded there.
+                  </p>
+                </>
+              )}
+              {modal.kind === "receive" && (
+                <>
+                  {select(
+                    "Purchase line",
+                    "index",
+                    modal.document.data.lines.map((l: R, i: number) => ({
+                      id: String(i),
+                      name: `${l.name} · ordered ${qty(l.quantity)} kg`,
+                    })),
+                    "id",
+                    "name",
+                    "0",
+                  )}
+                  {locationSelect("locationId", "storage")}
+                  {input("Actual weight received now (kg)", "quantity")}
+                  {input("Boxes received now", "boxes", "number", false)}
+                  <p className="muted">
+                    Partial receipts are tracked. The server prevents receiving
+                    more than ordered.
+                  </p>
+                </>
+              )}
+              {modal.kind === "transfer" && (
+                <>
+                  {productSelect()}
+                  {select("From location", "from", s.locations)}
+                  {select("To location", "to", s.locations)}
+                  {input("Weight to transfer (kg)", "quantity")}
+                  {input("Reason", "reason")}
+                </>
+              )}
+              {modal.kind === "adjust" && (
+                <>
+                  {productSelect()}
+                  {locationSelect("locationId", "storage")}
+                  {select(
+                    "Adjustment kind",
+                    "kind",
+                    [
+                      {
+                        id: "opening",
+                        name: "Opening inventory (before any movements)",
+                      },
+                      { id: "count", name: "Physical count (set actual kg)" },
+                      { id: "spoilage", name: "Spoilage (remove kg)" },
+                      {
+                        id: "adjustment",
+                        name: "Positive stock adjustment (add kg)",
+                      },
+                    ],
+                    "id",
+                    "name",
+                    "count",
+                  )}
+                  {input(
+                    form.kind === "count" || form.kind === "opening"
+                      ? "Actual counted stock (kg)"
+                      : "Quantity (kg)",
+                    "quantity",
+                  )}
+                  {form.kind !== "spoilage" &&
+                    input(
+                      "Cost of additional stock (PHP/kg, if increasing)",
+                      "cost",
                       "text",
                       false,
                     )}
-                    {input("Document prefix", "prefix")}
-                    {input("Footer", "footer", "text", false)}
-                    {input("Print margin (0–10 mm)", "margin", "number")}
-                    {input("Print density (9–16 px)", "density", "number")}
-                    {select("Printer adapter", "printer", [
-                      { id: "browser", name: "Browser print fallback" },
-                      {
-                        id: "unconfigured",
-                        name: "Direct adapter · not configured",
-                      },
-                    ])}
-                    <p className="muted">
-                      Invoice fields and tax registration wording require
-                      accountant review. This application does not certify
-                      statutory invoices.
-                    </p>
-                  </>
+                  {input("Reason / count reference", "reason")}
+                </>
+              )}
+              {modal.kind === "expense" && (
+                <>
+                  {input("Expense date", "date", "date")}
+                  {input("Category", "category")}
+                  {input("Payee", "payee")}
+                  {input("Amount (PHP)", "amount")}
+                  {select(
+                    "Paid from",
+                    "paymentAccount",
+                    [
+                      { id: "Cash", name: "Cash" },
+                      { id: "Bank", name: "Bank" },
+                    ],
+                    "id",
+                    "name",
+                    "Cash",
+                  )}
+                  {input("Notes", "notes", "text", false)}
+                  <Field label="Optional receipt attachment · PDF / PNG / JPEG, up to 5 MB">
+                    <input
+                      type="file"
+                      accept="application/pdf,image/png,image/jpeg"
+                      onChange={(e) =>
+                        setAttachment(e.target.files?.[0] || null)
+                      }
+                    />
+                  </Field>
+                </>
+              )}
+              {modal.kind === "funds" && (
+                <>
+                  {select(
+                    "Receiving account",
+                    "account",
+                    [
+                      { id: "Cash", name: "Cash" },
+                      { id: "Bank", name: "Bank" },
+                    ],
+                    "id",
+                    "name",
+                    "Cash",
+                  )}
+                  {input("Amount (PHP)", "amount")}
+                  {input("Reason / opening cash reference", "reason")}
+                  <p className="muted">
+                    Owner funding increases cash or bank and owner capital. It
+                    is not sales revenue.
+                  </p>
+                </>
+              )}
+              {(modal.kind === "payment" ||
+                modal.kind === "supplierPayment") && (
+                <>
+                  <div className="info">
+                    Outstanding balance: {php(modal.document.balance)}
+                  </div>
+                  {input("Payment amount (PHP)", "amount")}
+                  {modal.kind === "payment" &&
+                    input("Cash tendered (PHP)", "tendered", "text", false)}
+                </>
+              )}
+              {modal.kind === "return" && (
+                <>
+                  {select(
+                    "Original sale line",
+                    "index",
+                    modal.document.data.lines.map((l: R, i: number) => ({
+                      id: String(i),
+                      name: `${l.name} · ${qty(l.quantity)} ${l.unit === "kg" ? "kg" : "units"}`,
+                    })),
+                    "id",
+                    "name",
+                    "0",
+                  )}
+                  {input("Quantity to return", "quantity")}
+                  {input("Reason for return / reversal", "reason")}
+                  <label className="checkbox">
+                    <input
+                      type="checkbox"
+                      checked={form.restock === true}
+                      onChange={(e) => set("restock", e.target.checked)}
+                    />{" "}
+                    Return physical meat to original location
+                  </label>
+                  <p className="muted">
+                    Unpaid balances are reduced first. Any remainder is a cash
+                    refund. To reverse a whole sale, return each line in full.
+                    Posted history stays visible.
+                  </p>
+                </>
+              )}
+              {modal.kind === "settings" && (
+                <>
+                  {input("Business name", "name")}
+                  {input("Address", "address", "text", false)}
+                  {input("Contact", "contact", "text", false)}
+                  {input("Invoice heading", "heading")}
+                  {input(
+                    "Additional invoice fields / registration details (accountant reviewed)",
+                    "invoiceDetails",
+                    "text",
+                    false,
+                  )}
+                  {input("Document prefix", "prefix")}
+                  {input("Footer", "footer", "text", false)}
+                  {input("Print margin (0–10 mm)", "margin", "number")}
+                  {input("Print density (9–16 px)", "density", "number")}
+                  {select("Printer adapter", "printer", [
+                    { id: "browser", name: "Browser print fallback" },
+                    {
+                      id: "unconfigured",
+                      name: "Direct adapter · not configured",
+                    },
+                  ])}
+                  <p className="muted">
+                    Invoice fields and tax registration wording require
+                    accountant review. This application does not certify
+                    statutory invoices.
+                  </p>
+                </>
+              )}
+              <button
+                type="submit"
+                className="primary wide"
+                disabled={busy || !online}
+              >
+                {busy ? (
+                  <LoadingIndicator label="Saving..." inline />
+                ) : (
+                  "Save " + (modal.kind === "return" ? "return" : "record")
                 )}
-                <button
-                  type="submit"
-                  className="primary wide"
-                  disabled={busy || !online}
-                >
-                  {busy
-                    ? "Saving…"
-                    : "Save " + (modal.kind === "return" ? "return" : "record")}
-                </button>
-              </form>
-            )}
-          </section>
-        </div>
+              </button>
+            </form>
+          )}
+        </Modal>
       )}
       {receipt && (
         <ReceiptDialog
@@ -2770,6 +2751,7 @@ export default function Shop() {
           onClose={() => setReceipt(null)}
         />
       )}
+      {busy && <LoadingOverlay />}
     </div>
   );
 }

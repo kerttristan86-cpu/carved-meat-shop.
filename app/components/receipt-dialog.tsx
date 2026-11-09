@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { Printer, X } from "lucide-react";
 import { php, qty } from "../../lib/money";
-import { date, number } from "./shared";
+import { date, number, Modal, LoadingIndicator } from "./shared";
 import {
   claimAutoPrint,
   connectBluetoothPrinter,
@@ -32,7 +32,9 @@ export default function ReceiptDialog({
 }) {
   const [message, setMessage] = useState(""),
     [slip, setSlip] = useState(false),
-    [busy, setBusy] = useState(false),
+    [operation, setOperation] = useState<
+      "" | "Printing…" | "Connecting…" | "Preparing image…"
+    >(""),
     [connection, setConnection] = useState(() => bluetoothPrinterName()),
     [quality, setQuality] = useState<"fast" | "sharp">("fast"),
     [includeLogo, setIncludeLogo] = useState(true);
@@ -42,10 +44,11 @@ export default function ReceiptDialog({
       setIncludeLogo(localStorage.getItem("carved-print-logo") !== "off");
     } catch {}
   }, []);
+  const busy = operation !== "";
   const settings = d.data.shop || s;
   async function autoPrint(name: string) {
     if (!claimAutoPrint(d.id)) return;
-    setBusy(true);
+    setOperation("Printing…");
     setMessage(`Printing on ${name}…`);
     try {
       await printBluetoothReceipt(window.document.getElementById("receipt")!);
@@ -55,7 +58,7 @@ export default function ReceiptDialog({
     } catch (e) {
       setMessage((e as Error).message);
     } finally {
-      setBusy(false);
+      setOperation("");
     }
   }
   useEffect(() => {
@@ -73,11 +76,11 @@ export default function ReceiptDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   async function connect() {
-    setBusy(true);
+    setOperation("Connecting…");
     try {
       const name = await connectBluetoothPrinter();
       setConnection(name);
-      setBusy(false);
+      setOperation("");
       if (freshSale) await autoPrint(name);
       else
         setMessage(
@@ -87,11 +90,11 @@ export default function ReceiptDialog({
       setConnection(bluetoothPrinterName());
       setMessage((e as Error).message);
     } finally {
-      setBusy(false);
+      setOperation("");
     }
   }
   async function saveImage() {
-    setBusy(true);
+    setOperation("Preparing image…");
     try {
       const canvas = await receiptCanvas(
         window.document.getElementById("receipt")!,
@@ -106,11 +109,11 @@ export default function ReceiptDialog({
     } catch (e) {
       setMessage((e as Error).message);
     } finally {
-      setBusy(false);
+      setOperation("");
     }
   }
   async function print() {
-    setBusy(true);
+    setOperation("Printing…");
     try {
       if (connection) {
         // A manual print counts, so a later reconnect can't print this sale again.
@@ -129,7 +132,7 @@ export default function ReceiptDialog({
     } catch (e) {
       setMessage((e as Error).message);
     } finally {
-      setBusy(false);
+      setOperation("");
     }
   }
   const payments = related.filter(
@@ -139,181 +142,183 @@ export default function ReceiptDialog({
       (x) => x.kind === "return" && x.data.saleId === d.id,
     );
   return (
-    <div className="modal-backdrop receipt-backdrop">
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-label="Saved receipt preview"
-        className="receipt-dialog"
-        onKeyDown={(e) => {
-          if (e.key === "Escape") onClose();
-        }}
-      >
-        <div className="receipt-tools">
-          <div>
-            <h2>{slip ? "Internal order slip" : "Saved receipt"}</h2>
-            <small>Reprinting never posts another sale.</small>
-          </div>
-          <button autoFocus aria-label="Close receipt" onClick={onClose}>
-            <X size={20} />
-          </button>
+    <Modal
+      ariaLabel="Saved receipt preview"
+      busy={busy}
+      onClose={onClose}
+      className="receipt-dialog"
+      backdropClassName="receipt-backdrop"
+    >
+      <div className="receipt-tools">
+        <div>
+          <h2>{slip ? "Internal order slip" : "Saved receipt"}</h2>
+          <small>Reprinting never posts another sale.</small>
         </div>
+        <button
+          disabled={busy}
 
-        <div
-          id="receipt"
-          style={
-            {
-              "--receipt-margin": `${s.margin}mm`,
-              "--receipt-font": `${Math.max(13, Number(s.density) || 13)}px`,
-            } as React.CSSProperties
-          }
+          aria-label="Close receipt"
+          onClick={onClose}
         >
-          <img src="/carved-logo-transparent.png" alt="CARVED Meat Shop" />
-          <h3>{settings.name}</h3>
-          {settings.address && <p>{settings.address}</p>}
-          {settings.contact && <p>{settings.contact}</p>}
-          {settings.invoiceDetails && <p>{settings.invoiceDetails}</p>}
-          <h4>
-            {slip ? "Internal order slip · not an invoice" : settings.heading}
-          </h4>
+          <X size={20} />
+        </button>
+      </div>
 
-          <p>
-            {number(d, settings)}
-            <br />
-            {date(d.created_at)} · Asia/Manila
-            <br />
-            Operator: Shop owner
-            <br />
-            Customer: {customer}
-          </p>
-          <hr />
-          {d.data.lines.map((l: R, i: number) => (
-            <div className="receipt-line" key={i}>
-              <strong>{l.name}</strong>
-              <div>
-                <span>
-                  {qty(l.quantity)}{" "}
-                  {l.unit === "kg" ? "kg" : l.serviceUnit || "units"} ×{" "}
-                  <span style={{ whiteSpace: "nowrap" }}>
-                    {php(l.price)} {l.tier.toUpperCase()}
-                  </span>
-                  {l.boxes ? ` · ${l.boxes} boxes` : ""}
+      <div
+        id="receipt"
+        style={
+          {
+            "--receipt-margin": `${s.margin}mm`,
+            "--receipt-font": `${Math.max(13, Number(s.density) || 13)}px`,
+          } as React.CSSProperties
+        }
+      >
+        <img src="/carved-logo-transparent.png" alt="CARVED Meat Shop" />
+        <h3>{settings.name}</h3>
+        {settings.address && <p>{settings.address}</p>}
+        {settings.contact && <p>{settings.contact}</p>}
+        {settings.invoiceDetails && <p>{settings.invoiceDetails}</p>}
+        <h4>
+          {slip ? "Internal order slip · not an invoice" : settings.heading}
+        </h4>
+
+        <p>
+          {number(d, settings)}
+          <br />
+          {date(d.created_at)} · Asia/Manila
+          <br />
+          Operator: Shop owner
+          <br />
+          Customer: {customer}
+        </p>
+        <hr />
+        {d.data.lines.map((l: R, i: number) => (
+          <div className="receipt-line" key={i}>
+            <strong>{l.name}</strong>
+            <div>
+              <span>
+                {qty(l.quantity)}{" "}
+                {l.unit === "kg" ? "kg" : l.serviceUnit || "units"} ×{" "}
+                <span style={{ whiteSpace: "nowrap" }}>
+                  {php(l.price)} {l.tier.toUpperCase()}
                 </span>
-                <b>{php(l.amount)}</b>
-              </div>
+                {l.boxes ? ` · ${l.boxes} boxes` : ""}
+              </span>
+              <b>{php(l.amount)}</b>
             </div>
-          ))}
-          <hr />
-          <div className="receipt-total">
-            <strong>TOTAL</strong>
-            <strong>{php(d.data.total)}</strong>
           </div>
-          <div className="receipt-total">
-            <span>Cash tendered</span>
-            <span>{php(d.data.tendered)}</span>
-          </div>
-          <div className="receipt-total">
-            <span>Change</span>
-            <span>{php(d.data.change)}</span>
-          </div>
-          {payments.map((p) => (
-            <div className="receipt-total" key={p.id}>
-              <span>Later payment · {date(p.created_at)}</span>
-              <span>{php(p.data.amount)}</span>
-            </div>
-          ))}
-          {returns.map((p) => (
-            <div className="receipt-total" key={p.id}>
-              <span>Return · {date(p.created_at)}</span>
-              <span>-{php(p.data.total)}</span>
-            </div>
-          ))}
-          <hr />
-          <p>{settings.footer}</p>
-          <p className="review-note">
-            Layout requires accountant review.
-            <br />
-            Not certified for statutory use.
-          </p>
+        ))}
+        <hr />
+        <div className="receipt-total">
+          <strong>TOTAL</strong>
+          <strong>{php(d.data.total)}</strong>
         </div>
-        <div className="receipt-tools bottom">
-          <p role="status">
-            {message ||
-              "80 mm layout · monochrome thermal preview. Physical printer compatibility is unverified."}
-          </p>
-          <button disabled={busy} onClick={() => setSlip((v) => !v)}>
-            {slip ? "View sales invoice" : "View internal order slip"}
-          </button>
-          <label className="field" style={{ width: "100%" }}>
-            <span>Print mode</span>
-            <select
-              aria-label="Print mode"
-              disabled={busy}
-              value={quality}
-              onChange={(e) => {
-                const value = e.target.value as "fast" | "sharp";
-                try {
-                  localStorage.setItem("carved-print-quality", value);
-                } catch {
-                  setMessage(
-                    "Cannot save print quality. Allow browser storage and try again.",
-                  );
-                  return;
-                }
-                setQuality(value);
-              }}
-            >
-              <option value="fast">Fast � bolder, coarser edges</option>
-              <option value="sharp">Sharper � slower printing</option>
-            </select>
-          </label>
-          {quality === "fast" && (
-            <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <input
-                type="checkbox"
-                style={{ width: 20, minHeight: 20 }}
-                checked={includeLogo}
-                disabled={busy}
-                onChange={(e) => {
-                  try {
-                    localStorage.setItem(
-                      "carved-print-logo",
-                      e.target.checked ? "on" : "off",
-                    );
-                    setIncludeLogo(e.target.checked);
-                  } catch {
-                    setMessage(
-                      "Allow browser storage to save print preferences.",
-                    );
-                  }
-                }}
-              />
-              Include logo (turn off for fastest printing)
-            </label>
-          )}
-          <p>
-            Fast text uses the printer font and PHP currency labels. The receipt
-            preview keeps its original appearance.
-          </p>
-          <button disabled={busy} onClick={connect}>
-            {connection ? `Connected: ${connection}` : "Connect printer"}
-          </button>
-          <button disabled={busy} onClick={saveImage}>
-            Save receipt image
-          </button>
-          <button
+        <div className="receipt-total">
+          <span>Cash tendered</span>
+          <span>{php(d.data.tendered)}</span>
+        </div>
+        <div className="receipt-total">
+          <span>Change</span>
+          <span>{php(d.data.change)}</span>
+        </div>
+        {payments.map((p) => (
+          <div className="receipt-total" key={p.id}>
+            <span>Later payment · {date(p.created_at)}</span>
+            <span>{php(p.data.amount)}</span>
+          </div>
+        ))}
+        {returns.map((p) => (
+          <div className="receipt-total" key={p.id}>
+            <span>Return · {date(p.created_at)}</span>
+            <span>-{php(p.data.total)}</span>
+          </div>
+        ))}
+        <hr />
+        <p>{settings.footer}</p>
+        <p className="review-note">
+          Layout requires accountant review.
+          <br />
+          Not certified for statutory use.
+        </p>
+      </div>
+      <div className="receipt-tools bottom" aria-busy={busy}>
+        {busy && <LoadingIndicator label={operation} />}
+        <p role="status">
+          {message ||
+            "80 mm layout · monochrome thermal preview. Physical printer compatibility is unverified."}
+        </p>
+        <button disabled={busy} onClick={() => setSlip((v) => !v)}>
+          {slip ? "View sales invoice" : "View internal order slip"}
+        </button>
+        <label className="field" style={{ width: "100%" }}>
+          <span>Print mode</span>
+          <select
+            aria-label="Print mode"
             disabled={busy}
-            onClick={() => {
-              window.print();
+            value={quality}
+            onChange={(e) => {
+              const value = e.target.value as "fast" | "sharp";
+              try {
+                localStorage.setItem("carved-print-quality", value);
+              } catch {
+                setMessage(
+                  "Cannot save print quality. Allow browser storage and try again.",
+                );
+                return;
+              }
+              setQuality(value);
             }}
           >
-            System print
-          </button>
-          <button disabled={busy} className="primary" onClick={print}>
-            <Printer size={18} /> Print receipt
-          </button>
-        </div>
-      </section>
-    </div>
+            <option value="fast">Fast - bolder, coarser edges</option>
+            <option value="sharp">Sharper - slower printing</option>
+          </select>
+        </label>
+        {quality === "fast" && (
+          <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <input
+              type="checkbox"
+              style={{ width: 20, minHeight: 20 }}
+              checked={includeLogo}
+              disabled={busy}
+              onChange={(e) => {
+                try {
+                  localStorage.setItem(
+                    "carved-print-logo",
+                    e.target.checked ? "on" : "off",
+                  );
+                  setIncludeLogo(e.target.checked);
+                } catch {
+                  setMessage(
+                    "Allow browser storage to save print preferences.",
+                  );
+                }
+              }}
+            />
+            Include logo (turn off for fastest printing)
+          </label>
+        )}
+        <p>
+          Fast text uses the printer font and PHP currency labels. The receipt
+          preview keeps its original appearance.
+        </p>
+        <button disabled={busy} onClick={connect}>
+          {connection ? `Connected: ${connection}` : "Connect printer"}
+        </button>
+        <button disabled={busy} onClick={saveImage}>
+          Save receipt image
+        </button>
+        <button
+          disabled={busy}
+          onClick={() => {
+            window.print();
+          }}
+        >
+          System print
+        </button>
+        <button disabled={busy} className="primary" onClick={print}>
+          <Printer size={18} /> Print receipt
+        </button>
+      </div>
+    </Modal>
   );
 }

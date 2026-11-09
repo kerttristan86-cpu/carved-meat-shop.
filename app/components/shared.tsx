@@ -1,4 +1,6 @@
-import { Package } from "lucide-react";
+"use client";
+import { useEffect, useRef } from "react";
+import { LoaderCircle, Package } from "lucide-react";
 type R = Record<string, any>;
 export const date = (d: string) =>
   new Intl.DateTimeFormat("en-PH", {
@@ -55,4 +57,136 @@ export function Pill({
   tone?: string;
 }) {
   return <span className={`pill ${tone}`}>{children}</span>;
+}
+export function LoadingIndicator({
+  label = "Loading",
+  inline = false,
+}: {
+  label?: string;
+  inline?: boolean;
+}) {
+  return (
+    <span
+      className={`loading-indicator${inline ? " inline" : ""}`}
+      role="status"
+    >
+      <LoaderCircle aria-hidden="true" size={inline ? 16 : 24} />
+      <span>{label}</span>
+    </span>
+  );
+}
+export function LoadingOverlay({
+  label = "Saving changes…",
+}: {
+  label?: string;
+}) {
+  return (
+    <div className="loading-overlay" role="status" aria-live="polite">
+      <LoadingIndicator label={label} />
+    </div>
+  );
+}
+export function LoadingScreen() {
+  return (
+    <main className="login loading-screen">
+      <img src="/carved-logo-transparent.png" alt="CARVED Meat Shop" />
+      <LoadingIndicator label="Opening your shop…" />
+    </main>
+  );
+}
+export function Modal({
+  ariaLabel,
+  onClose,
+  children,
+  busy = false,
+  className = "modal",
+  backdropClassName = "",
+}: {
+  ariaLabel: string;
+  onClose: () => void;
+  children: React.ReactNode;
+  busy?: boolean;
+  className?: string;
+  backdropClassName?: string;
+}) {
+  const ref = useRef<HTMLElement>(null);
+  const current = useRef({ onClose, busy });
+  current.current = { onClose, busy };
+  useEffect(() => {
+    const node = ref.current!;
+    const previous = document.activeElement as HTMLElement | null;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const focusable = () =>
+      Array.from(
+        node.querySelectorAll<HTMLElement>(
+          "button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),summary,[tabindex]:not([tabindex='-1'])",
+        ),
+      ).filter(
+        (el) => el.getClientRects().length && !el.closest("[hidden],[inert]"),
+      );
+    (focusable()[0] || node).focus();
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        if (!current.current.busy) current.current.onClose();
+      }
+      if (event.key !== "Tab") return;
+      const nodes = focusable();
+      const first = nodes[0],
+        last = nodes[nodes.length - 1];
+      if (!first) {
+        event.preventDefault();
+        node.focus();
+        return;
+      }
+      if (
+        event.shiftKey &&
+        (document.activeElement === first ||
+          !node.contains(document.activeElement))
+      ) {
+        event.preventDefault();
+        last.focus();
+      } else if (
+        !event.shiftKey &&
+        (document.activeElement === last ||
+          !node.contains(document.activeElement))
+      ) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    const focusin = (event: FocusEvent) => {
+      if (!node.contains(event.target as Node))
+        (focusable()[0] || node).focus();
+    };
+    document.addEventListener("keydown", keydown);
+    document.addEventListener("focusin", focusin);
+    return () => {
+      document.removeEventListener("keydown", keydown);
+      document.removeEventListener("focusin", focusin);
+      document.body.style.overflow = overflow;
+      if (previous?.isConnected) previous.focus();
+    };
+  }, []);
+  return (
+    <div
+      className={`modal-backdrop ${backdropClassName}`}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget && !busy) onClose();
+      }}
+    >
+      <section
+        ref={ref}
+        className={className}
+        role="dialog"
+        aria-modal="true"
+        aria-label={ariaLabel}
+        aria-busy={busy}
+        tabIndex={-1}
+      >
+        {children}
+      </section>
+    </div>
+  );
 }
