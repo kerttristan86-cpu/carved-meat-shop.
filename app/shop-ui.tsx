@@ -104,6 +104,27 @@ export default function Shop() {
     [from, setFrom] = useState(today()),
     [to, setTo] = useState(today()),
     [reportTab, setReportTab] = useState("Profit & loss");
+  const contentRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const node = contentRef.current;
+    const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    if (!node || preference.matches) return;
+    const animation = node.animate(
+      [
+        { opacity: 0.75, transform: "translateY(5px)" },
+        { opacity: 1, transform: "translateY(0)" },
+      ],
+      { duration: 160, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
+    );
+    const cancel = () => animation.cancel();
+    preference.addEventListener("change", cancel);
+    window.addEventListener("beforeprint", cancel);
+    return () => {
+      animation.cancel();
+      preference.removeEventListener("change", cancel);
+      window.removeEventListener("beforeprint", cancel);
+    };
+  }, [page, loading, login]);
   const pendingCheckout = useRef<R | null>(null);
   const [pendingOperation, setPendingOperation] = useState<R | null>(null);
   const checkoutKey = useRef(""),
@@ -693,7 +714,7 @@ export default function Shop() {
             <div className="avatar small">CO</div>
           </div>
         </header>
-        <main className="main">
+        <main ref={contentRef} className="main">
           <div className="page-heading">
             <div>
               <div className="eyebrow">CARVED MEAT SHOP</div>

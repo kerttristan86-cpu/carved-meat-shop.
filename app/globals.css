@@ -1910,3 +1910,110 @@ button {
 .toast a {
   pointer-events: auto;
 }
+
+/* Short, compositor-friendly motion keeps shop actions immediate. */
+:root {
+  --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+@media screen and (prefers-reduced-motion: no-preference) {
+  button {
+    transition:
+      background-color 140ms ease,
+      border-color 140ms ease,
+      box-shadow 140ms ease,
+      transform 100ms ease;
+  }
+  button:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+  input,
+  select,
+  textarea {
+    transition:
+      border-color 140ms ease,
+      box-shadow 140ms ease;
+  }
+  .modal-backdrop:not(.receipt-backdrop) {
+    animation: shop-fade-in 140ms ease-out;
+  }
+  .modal {
+    animation: shop-dialog-in 180ms var(--motion-ease);
+    transform-origin: center;
+  }
+  /* Receipt geometry stays exact during immediate automatic printing. */
+  .receipt-tools {
+    animation: shop-fade-in 140ms ease-out;
+  }
+  .toast {
+    animation: shop-toast-in 200ms var(--motion-ease);
+  }
+  .login-card {
+    animation: shop-dialog-in 220ms var(--motion-ease);
+  }
+  .loading-overlay {
+    animation: shop-fade-in 120ms ease-out;
+  }
+  .panel,
+  .stat,
+  .table-wrap,
+  .cart-line {
+    animation: shop-fade-in 160ms ease-out;
+  }
+  .product-card {
+    transition:
+      border-color 140ms ease,
+      background-color 140ms ease,
+      box-shadow 140ms ease,
+      transform 140ms ease;
+  }
+}
+@media screen and (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .product-card:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 14px #0369a114;
+  }
+  .product-card:active:not(:disabled) {
+    transform: translateY(0);
+  }
+}
+@keyframes shop-fade-in {
+  from {
+    opacity: 0.65;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes shop-dialog-in {
+  from {
+    opacity: 0.65;
+    transform: translateY(6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes shop-toast-in {
+  from {
+    opacity: 0.65;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@media print {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .receipt-dialog,
+  #receipt {
+    transform: none !important;
+    opacity: 1 !important;
+  }
+}

@@ -52,6 +52,7 @@ async function main() {
     });
     const context = await browser.newContext({
       viewport: { width: 1280, height: 800 },
+      reducedMotion: "no-preference",
     });
     const page = await context.newPage();
     const errors: string[] = [];
@@ -325,6 +326,12 @@ async function main() {
       0,
       "Errors use toasts rather than inline banners",
     );
+    assert.match(
+      await page
+        .locator(".toast-error")
+        .evaluate((el) => getComputedStyle(el).animationName),
+      /shop-toast-in/,
+    );
     await page.screenshot({
       path: "test-results/pos-error-toast.png",
       fullPage: true,
@@ -356,6 +363,18 @@ async function main() {
       .getByRole("button", { name: "Complete sale", exact: true })
       .click();
     await page.getByRole("dialog", { name: "Saved receipt preview" }).waitFor();
+    const receiptMotion = await page
+      .locator(".receipt-dialog")
+      .evaluate((el) => ({
+        transform: getComputedStyle(el).transform,
+        animation: getComputedStyle(el).animationName,
+        backdropAnimation: getComputedStyle(el.parentElement!).animationName,
+      }));
+    assert.deepEqual(
+      receiptMotion,
+      { transform: "none", animation: "none", backdropAnimation: "none" },
+      "Receipt capture must remain exact even during immediate automatic printing",
+    );
     const printQuality = page.getByLabel("Print mode", { exact: true });
     assert.equal(await printQuality.inputValue(), "fast");
     await printQuality.selectOption("sharp");
@@ -859,6 +878,10 @@ async function main() {
       name: "product",
       exact: true,
     });
+    assert.match(
+      await productDialog.evaluate((el) => getComputedStyle(el).animationName),
+      /shop-dialog-in/,
+    );
     assert.equal(
       await productDialog.getByRole("button", { name: "Close dialog" }).count(),
       1,
@@ -1019,6 +1042,34 @@ async function main() {
       path: "test-results/audit-history-readable.png",
       fullPage: true,
     });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.getByRole("button", { name: "Products", exact: true }).click();
+    assert.equal(
+      await page
+        .locator("main.main")
+        .evaluate((el) => el.getAnimations().length),
+      0,
+    );
+    await page
+      .getByRole("button", { name: "Add product", exact: true })
+      .click();
+    assert.equal(
+      await page
+        .getByRole("dialog")
+        .evaluate((el) => getComputedStyle(el).animationName),
+      "none",
+    );
+    assert.equal(
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Close dialog" })
+        .evaluate((el) => getComputedStyle(el).transitionDuration),
+      "0s",
+    );
+    await page
+      .getByRole("button", { name: "Close dialog", exact: true })
+      .click();
+    await page.emulateMedia({ reducedMotion: "no-preference" });
     assert.deepEqual(errors, []);
     console.log(
       "PASS: owner login, closed registration, authorization, CSRF, purchase/receive/transfer, tablet POS, decimal sale/change, receipt preview/reprint, expense, return, partial balances, all modules, tablet screenshots and 80mm PDF.",
