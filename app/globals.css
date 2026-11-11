@@ -2043,3 +2043,19 @@ button.printer-status {
 .printer-status i {
   flex-shrink: 0;
 }
+
+.product-tile {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.product-tile > .product-card {
+  width: 100%;
+  flex: 1;
+}
+.product-tile > .product-delete {
+  width: 100%;
+  min-height: 44px;
+  font-size: 13px;
+}

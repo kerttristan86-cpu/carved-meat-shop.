@@ -28,9 +28,12 @@ export async function verifyDeletion(page: Page, context: BrowserContext) {
       .count(),
     0,
   );
-  await page.getByRole("button", { name: "Products", exact: true }).click();
+  await page.getByRole("button", { name: /QA-DEL-U/ }).click();
+  await page.getByLabel("Quantity", { exact: true }).fill("1");
+  await page.getByRole("button", { name: "Add to order", exact: true }).click();
+  assert.equal(await page.locator(".cart-line").count(), 1);
   const remove = page.getByRole("button", {
-    name: "Delete QA unused product",
+    name: "Delete product QA unused product",
     exact: true,
   });
   await remove.click();
@@ -41,6 +44,7 @@ export async function verifyDeletion(page: Page, context: BrowserContext) {
   await confirm.getByRole("button", { name: "Cancel", exact: true }).click();
   await confirm.waitFor({ state: "hidden" });
   assert.equal(await remove.count(), 1);
+  assert.equal(await page.locator(".cart-line").count(), 1);
   await remove.click();
   await page.screenshot({
     path: "test-results/delete-product-confirmation.png",
@@ -48,6 +52,14 @@ export async function verifyDeletion(page: Page, context: BrowserContext) {
   await confirm.getByRole("button", { name: "Delete", exact: true }).click();
   await confirm.waitFor({ state: "hidden" });
   assert.equal(await remove.count(), 0);
+  assert.equal(await page.locator(".cart-line").count(), 0);
+  await page.getByRole("button", { name: "Products", exact: true }).click();
+  assert.equal(
+    await page
+      .getByRole("button", { name: "Delete QA unused product", exact: true })
+      .count(),
+    0,
+  );
   const after = await (
     await context.request.get("http://127.0.0.1:3100/api/shop")
   ).json();

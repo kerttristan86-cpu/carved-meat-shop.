@@ -269,11 +269,17 @@ export default function Shop() {
   async function confirmDeletion() {
     if (!deletion || busy) return;
     try {
+      if (cart.some((line) => line.productId === deletion.id) && !cartChange())
+        return;
       await mutate("delete", {
         entity: "product",
         id: deletion.id,
         reason: "Product deleted after confirmation",
       });
+      setCart((lines) =>
+        lines.filter((line) => line.productId !== deletion.id),
+      );
+      if (selected?.id === deletion.id) setSelected(null);
       setDeletion(null);
       setNotice("Product deleted.");
     } catch (reason) {
@@ -1130,52 +1136,67 @@ export default function Shop() {
                 </div>
                 <div className="products-grid">
                   {filtered.map((p) => (
-                    <button
-                      key={p.id}
-                      className={`product-card ${selected?.id === p.id ? "chosen" : ""}`}
-                      onClick={() => {
-                        setSelected(p);
-                        setTier("retail");
-                        setWeight("1.000");
-                        setBoxes("0");
-                      }}
-                    >
-                      <div
-                        className={`product-symbol ${p.category.toLowerCase().replaceAll(" ", "-")}`}
+                    <div key={p.id} className="product-tile">
+                      <button
+                        className={`product-card ${selected?.id === p.id ? "chosen" : ""}`}
+                        onClick={() => {
+                          setSelected(p);
+                          setTier("retail");
+                          setWeight("1.000");
+                          setBoxes("0");
+                        }}
                       >
-                        <span>
-                          {p.category === "Services" ? (
-                            <Scale size={27} />
-                          ) : (
-                            p.category.slice(0, 1)
-                          )}
-                        </span>
-                        <Plus size={17} />
-                      </div>
-                      <small>
-                        {p.code} · {p.category}
-                      </small>
-                      <strong>{p.name}</strong>
-                      <div>
-                        <b>
-                          {p.data.prices.retail == null
-                            ? "Unavailable"
-                            : php(p.data.prices.retail)}
-                        </b>
-                        <span>
-                          / {p.unit === "kg" ? "kg" : p.data.serviceUnit}
-                        </span>
-                      </div>
-                      <small
-                        className={
-                          stockQty(p.id) === 0 && p.unit === "kg" ? "zero" : ""
-                        }
+                        <div
+                          className={`product-symbol ${p.category.toLowerCase().replaceAll(" ", "-")}`}
+                        >
+                          <span>
+                            {p.category === "Services" ? (
+                              <Scale size={27} />
+                            ) : (
+                              p.category.slice(0, 1)
+                            )}
+                          </span>
+                          <Plus size={17} />
+                        </div>
+                        <small>
+                          {p.code} · {p.category}
+                        </small>
+                        <strong>{p.name}</strong>
+                        <div>
+                          <b>
+                            {p.data.prices.retail == null
+                              ? "Unavailable"
+                              : php(p.data.prices.retail)}
+                          </b>
+                          <span>
+                            / {p.unit === "kg" ? "kg" : p.data.serviceUnit}
+                          </span>
+                        </div>
+                        <small
+                          className={
+                            stockQty(p.id) === 0 && p.unit === "kg"
+                              ? "zero"
+                              : ""
+                          }
+                        >
+                          {p.unit === "kg"
+                            ? `${qty(stockQty(p.id, location))} kg at ${locName(location)}`
+                            : "Service · no stock deduction"}
+                        </small>
+                      </button>
+                      <button
+                        type="button"
+                        className="danger product-delete"
+                        disabled={busy}
+                        aria-label={`Delete product ${p.name}`}
+                        onClick={() => {
+                          setError("");
+                          setDeletion(p);
+                        }}
                       >
-                        {p.unit === "kg"
-                          ? `${qty(stockQty(p.id, location))} kg at ${locName(location)}`
-                          : "Service · no stock deduction"}
-                      </small>
-                    </button>
+                        <Trash2 size={16} /> Delete product
+                      </button>
+                    </div>
                   ))}
                 </div>
                 {!filtered.length && (
@@ -2801,9 +2822,9 @@ export default function Shop() {
           </div>
           <div className="settings-body">
             <p>
-              Delete this product from the catalog? Products with stock or saved
-              transaction history are protected. This deletion stays in audit
-              history.
+              Delete this product from the catalog and remove any unsaved order
+              lines for it? Products with stock or saved transaction history are
+              protected. This deletion stays in audit history.
             </p>
             <div className="row-actions">
               <button disabled={busy} onClick={() => setDeletion(null)}>
