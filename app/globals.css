@@ -2059,3 +2059,26 @@ button.printer-status {
   min-height: 44px;
   font-size: 13px;
 }
+
+.weight-entry-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0;
+}
+.weight-entry-toggle input {
+  width: 22px;
+  min-height: 22px;
+}
+.weight-entry-batch {
+  margin: 12px 0;
+}
+.weight-entry-batch textarea {
+  min-height: 130px;
+}
+#receipt .receipt-weight-entries {
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  margin: 6px 0 10px;
+}

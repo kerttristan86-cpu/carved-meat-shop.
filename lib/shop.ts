@@ -1,3 +1,4 @@
+import { validateWeightEntries } from "./weight-entries";
 import { deleteUnusedRecord } from "./record-deletion";
 import { createHash, randomUUID } from "node:crypto";
 import { readTransaction, type Database, type Queryable } from "./postgres";
@@ -489,6 +490,19 @@ export async function execute(
         if (!p.data.active) throw new Error("Product is inactive");
         const q = positive(quantity(l.quantity)),
           tier = z.enum(["retail", "bulk", "box"]).parse(l.tier);
+        const batch =
+          l.weightEntries === undefined
+            ? undefined
+            : validateWeightEntries(l.weightEntries, l.quantity);
+        if (batch && p.unit !== "kg")
+          throw new Error("Multiple weights are for kg products only.");
+        if (
+          batch &&
+          tier === "box" &&
+          l.boxes != null &&
+          boxCount(l.boxes) !== batch.boxes
+        )
+          throw new Error("Box count must match the number of weights.");
         const price = p.data.prices[tier];
         if (price === null || price === undefined)
           throw new Error(`${p.name}: selected price is unavailable`);
@@ -540,7 +554,8 @@ export async function execute(
           price,
           amount,
           cost,
-          boxes: tier === "box" ? boxCount(l.boxes) : 0,
+          boxes: tier === "box" ? (batch?.boxes ?? boxCount(l.boxes)) : 0,
+          weightEntries: batch?.grams,
           overrideReason: String(l.overrideReason || "").slice(0, 300),
         };
         lines.push(line);

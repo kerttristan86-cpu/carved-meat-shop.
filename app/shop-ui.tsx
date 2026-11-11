@@ -1,5 +1,6 @@
 "use client";
 import { PrinterStatus } from "./components/printer-status";
+import { parseWeightEntries } from "../lib/weight-entries";
 import { Toast } from "./components/notifications";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -106,6 +107,27 @@ export default function Shop() {
     [to, setTo] = useState(today()),
     [reportTab, setReportTab] = useState("Profit & loss");
   const [deletion, setDeletion] = useState<R | null>(null);
+  const [multipleWeights, setMultipleWeights] = useState(false),
+    [weightsText, setWeightsText] = useState("");
+  const entryBatch = (() => {
+    if (!multipleWeights) return null;
+    try {
+      return parseWeightEntries(weightsText);
+    } catch {
+      return null;
+    }
+  })();
+  function updateWeights(text: string) {
+    setWeightsText(text);
+    try {
+      const batch = parseWeightEntries(text);
+      setWeight(batch.quantity);
+      setBoxes(tier === "box" ? String(batch.boxes) : "0");
+    } catch {
+      setWeight("");
+      setBoxes("0");
+    }
+  }
   const contentRef = useRef<HTMLElement>(null);
   useEffect(() => {
     const node = contentRef.current;
@@ -303,13 +325,28 @@ export default function Shop() {
       setError("This price tier is unavailable");
       return;
     }
+    if (multipleWeights && !entryBatch) {
+      try {
+        parseWeightEntries(weightsText);
+      } catch (reason) {
+        setError((reason as Error).message);
+      }
+      return;
+    }
     if (!/^\d+(\.\d{1,3})?$/.test(weight) || Number(weight) <= 0) {
       setError("Enter a positive quantity with up to three decimals");
       return;
     }
     if (!cartChange()) return;
     try {
-      validateCartLine({ quantity: weight, price, tier, boxes });
+      validateCartLine({
+        quantity: weight,
+        price,
+        tier,
+        boxes,
+        unit: selected.unit,
+        weightEntries: entryBatch?.entries,
+      });
     } catch (e) {
       setError((e as Error).message);
       return;
@@ -321,6 +358,7 @@ export default function Shop() {
         name: selected.name,
         unit: selected.unit,
         quantity: weight,
+        weightEntries: entryBatch?.entries,
         tier,
         price,
         boxes: tier === "box" ? boxCount(boxes) : 0,
@@ -328,6 +366,8 @@ export default function Shop() {
       },
     ]);
     setSelected(null);
+    setMultipleWeights(false);
+    setWeightsText("");
     setWeight("1.000");
     setBoxes("0");
     setOverride("");
@@ -354,13 +394,22 @@ export default function Shop() {
           locationId: location,
           partyId: customer || undefined,
           lines: cart.map(
-            ({ productId, quantity, tier, boxes, overrideReason, price }) => ({
+            ({
+              productId,
+              quantity,
+              tier,
+              boxes,
+              overrideReason,
+              price,
+              weightEntries,
+            }) => ({
               productId,
               quantity,
               tier,
               boxes: tier === "box" ? boxCount(boxes) : 0,
               overrideReason,
               expectedPrice: price,
+              weightEntries,
             }),
           ),
           tendered: tendered || "0",
@@ -636,7 +685,13 @@ export default function Shop() {
     );
   function loadDraft(d: R) {
     if (!cartChange()) return;
-    setCart(d.data.lines.map((l: R) => ({ ...l, quantity: qty(l.quantity) })));
+    setCart(
+      d.data.lines.map((l: R) => ({
+        ...l,
+        quantity: qty(l.quantity),
+        weightEntries: l.weightEntries?.map((n: number) => qty(n)),
+      })),
+    );
     setCustomer(d.party_id || "");
     setLocation(d.data.locationId);
     setDraftId(d.id);
@@ -1141,6 +1196,8 @@ export default function Shop() {
                         className={`product-card ${selected?.id === p.id ? "chosen" : ""}`}
                         onClick={() => {
                           setSelected(p);
+                          setMultipleWeights(false);
+                          setWeightsText("");
                           setTier("retail");
                           setWeight("1.000");
                           setBoxes("0");
@@ -1215,6 +1272,38 @@ export default function Shop() {
                         <X size={17} />
                       </button>
                     </div>
+                    {selected.unit === "kg" && (
+                      <label className="checkbox weight-entry-toggle">
+                        <input
+                          type="checkbox"
+                          checked={multipleWeights}
+                          onChange={(e) => {
+                            setMultipleWeights(e.target.checked);
+                            setWeightsText("");
+                            setWeight(e.target.checked ? "" : "1.000");
+                            setBoxes("0");
+                          }}
+                        />{" "}
+                        Enter multiple box weights
+                      </label>
+                    )}
+                    {multipleWeights && selected.unit === "kg" && (
+                      <div className="weight-entry-batch">
+                        <Field label="Weights per box / entry (kg)">
+                          <textarea
+                            rows={5}
+                            value={weightsText}
+                            placeholder={"11.67\n11.46\n11.39"}
+                            onChange={(e) => updateWeights(e.target.value)}
+                          />
+                        </Field>
+                        <p aria-live="polite">
+                          {entryBatch
+                            ? `${entryBatch.boxes} weights - total ${entryBatch.quantity} kg`
+                            : "Enter one positive weight per line. You can also paste weights separated by commas or spaces."}
+                        </p>
+                      </div>
+                    )}
                     <div className="form-grid">
                       <Field
                         label={
@@ -1225,6 +1314,7 @@ export default function Shop() {
                       >
                         <input
                           aria-label="Quantity"
+                          readOnly={multipleWeights}
                           inputMode="decimal"
                           value={weight}
                           onChange={(e) => setWeight(e.target.value)}
@@ -1236,7 +1326,13 @@ export default function Shop() {
                           value={tier}
                           onChange={(e) => {
                             setTier(e.target.value);
-                            setBoxes("0");
+                            setBoxes(
+                              multipleWeights &&
+                                entryBatch &&
+                                e.target.value === "box"
+                                ? String(entryBatch.boxes)
+                                : "0",
+                            );
                           }}
                         >
                           {[
@@ -1265,6 +1361,7 @@ export default function Shop() {
                             step="1"
                             inputMode="numeric"
                             value={boxes}
+                            readOnly={multipleWeights}
                             onChange={(e) => setBoxes(e.target.value)}
                           />
                         </Field>
@@ -1278,37 +1375,39 @@ export default function Shop() {
                         </Field>
                       )}
                     </div>
-                    <div className="keypad">
-                      {[
-                        "1",
-                        "2",
-                        "3",
-                        "4",
-                        "5",
-                        "6",
-                        "7",
-                        "8",
-                        "9",
-                        ".",
-                        "0",
-                        "⌫",
-                      ].map((k) => (
-                        <button
-                          key={k}
-                          onClick={() =>
-                            setWeight((v) =>
-                              k === "⌫"
-                                ? v.slice(0, -1)
-                                : v === "1.000"
-                                  ? k
-                                  : v + k,
-                            )
-                          }
-                        >
-                          {k}
-                        </button>
-                      ))}
-                    </div>
+                    {!multipleWeights && (
+                      <div className="keypad">
+                        {[
+                          "1",
+                          "2",
+                          "3",
+                          "4",
+                          "5",
+                          "6",
+                          "7",
+                          "8",
+                          "9",
+                          ".",
+                          "0",
+                          "⌫",
+                        ].map((k) => (
+                          <button
+                            key={k}
+                            onClick={() =>
+                              setWeight((v) =>
+                                k === "⌫"
+                                  ? v.slice(0, -1)
+                                  : v === "1.000"
+                                    ? k
+                                    : v + k,
+                              )
+                            }
+                          >
+                            {k}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     <button className="primary wide" onClick={addLine}>
                       <Plus size={18} /> Add to order
                     </button>
@@ -1369,6 +1468,13 @@ export default function Shop() {
                             {l.quantity} {l.unit === "kg" ? "kg" : "units"} ×{" "}
                             {php(l.price)} · {l.tier.toUpperCase()}
                           </small>
+                          {l.weightEntries?.length > 0 && (
+                            <small>
+                              {l.weightEntries.length} weights:{" "}
+                              {l.weightEntries.slice(0, 3).join(" + ")}
+                              {l.weightEntries.length > 3 ? " ..." : ""} kg
+                            </small>
+                          )}
                         </div>
                         <b>
                           {php(

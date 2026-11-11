@@ -143,6 +143,8 @@ export function receiptBlocks(element: HTMLElement): ReceiptBlock[] {
           left: content(row.firstElementChild),
           right: content(row.lastElementChild),
         });
+      const weights = child.querySelector(":scope > .receipt-weight-entries");
+      if (weights) blocks.push({ kind: "text", text: content(weights) });
       continue;
     }
     if (child.classList.contains("receipt-total")) {

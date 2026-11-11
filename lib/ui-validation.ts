@@ -1,3 +1,4 @@
+import { validateWeightEntries } from "./weight-entries";
 import { quantity, lineAmount, boxCount } from "./money";
 export function validateCartLine(line: Record<string, any>) {
   if (!Number.isSafeInteger(line.price) || line.price <= 0)
@@ -6,6 +7,13 @@ export function validateCartLine(line: Record<string, any>) {
     throw new Error("Quantity must be greater than zero");
   lineAmount(line.quantity, (line.price / 100).toFixed(2));
   if (line.tier === "box") boxCount(line.boxes);
+  if (line.weightEntries !== undefined) {
+    const batch = validateWeightEntries(line.weightEntries, line.quantity);
+    if (line.unit === "service")
+      throw new Error("Multiple weights are for kg products only.");
+    if (line.tier === "box" && boxCount(line.boxes) !== batch.boxes)
+      throw new Error("Box count must match the number of weights.");
+  }
 }
 export function restoreCart(value: unknown): Record<string, any>[] {
   if (!Array.isArray(value)) return [];

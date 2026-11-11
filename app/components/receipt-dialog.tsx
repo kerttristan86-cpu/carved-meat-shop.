@@ -190,7 +190,9 @@ export default function ReceiptDialog({
         {settings.contact && <p>{settings.contact}</p>}
         {settings.invoiceDetails && <p>{settings.invoiceDetails}</p>}
         <h4>
-          {slip ? "Internal order slip · not an invoice" : "Request for payment"}
+          {slip
+            ? "Internal order slip · not an invoice"
+            : "Request for payment"}
         </h4>
 
         <p>
@@ -217,6 +219,12 @@ export default function ReceiptDialog({
               </span>
               <b>{php(l.amount)}</b>
             </div>
+            {l.weightEntries?.length > 0 && (
+              <p className="receipt-weight-entries">
+                Weights (kg):{" "}
+                {l.weightEntries.map((n: number) => qty(n)).join(" + ")}
+              </p>
+            )}
           </div>
         ))}
         <hr />
@@ -247,8 +255,9 @@ export default function ReceiptDialog({
         <hr />
         <p>{settings.footer}</p>
         <p className="review-note">
-          This document is not valid for input tax. This is a request for payment.
-          This is not a sales invoice. Please ask for your sales invoice.
+          This document is not valid for input tax. This is a request for
+          payment. This is not a sales invoice. Please ask for your sales
+          invoice.
         </p>
       </div>
       <div className="receipt-tools bottom" aria-busy={busy}>
