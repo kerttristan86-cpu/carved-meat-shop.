@@ -202,8 +202,28 @@ export default function ReceiptDialog({
           <br />
           Operator: Shop owner
           <br />
-          Customer: {customer}
+          Customer:{" "}
+          {d.data.fulfillment === "delivery" && customer === "Walk-in customer"
+            ? d.data.delivery?.recipient
+            : customer}
         </p>
+        {d.data.fulfillment === "delivery" && d.data.delivery && (
+          <p className="receipt-delivery">
+            <strong>DELIVERY</strong>
+            <br />
+            Deliver to: {d.data.delivery.recipient}
+            <br />
+            Contact: {d.data.delivery.contact}
+            <br />
+            {d.data.delivery.address}
+            {d.data.delivery.notes && (
+              <>
+                <br />
+                Notes: {d.data.delivery.notes}
+              </>
+            )}
+          </p>
+        )}
         <hr />
         {d.data.lines.map((l: R, i: number) => (
           <div className="receipt-line" key={i}>

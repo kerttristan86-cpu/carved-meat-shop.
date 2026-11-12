@@ -20,7 +20,11 @@ export function scaled(
   return n;
 }
 export const money = (v: unknown) => scaled(v, 2);
-export const quantity = (v: unknown) => scaled(v, 3);
+export function normalizeQuantity(value: string) {
+  return value.trim().replace(/^(?=\.\d)/, "0");
+}
+export const quantity = (v: unknown) =>
+  scaled(typeof v === "string" ? normalizeQuantity(v) : v, 3);
 export function prorate(value: number, part: number, total: number) {
   const result = new Decimal(value)
     .mul(part)

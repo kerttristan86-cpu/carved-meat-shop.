@@ -1,6 +1,8 @@
 "use client";
 import { PrinterStatus } from "./components/printer-status";
 import { parseWeightEntries } from "../lib/weight-entries";
+import { parseFulfillment } from "../lib/fulfillment";
+import { normalizeQuantity, quantity as weightGrams } from "../lib/money";
 import { Toast } from "./components/notifications";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -107,6 +109,9 @@ export default function Shop() {
     [to, setTo] = useState(today()),
     [reportTab, setReportTab] = useState("Profit & loss");
   const [deletion, setDeletion] = useState<R | null>(null);
+  const emptyDelivery = { recipient: "", contact: "", address: "", notes: "" };
+  const [fulfillment, setFulfillment] = useState("walkin"),
+    [delivery, setDelivery] = useState<R>(emptyDelivery);
   const [multipleWeights, setMultipleWeights] = useState(false),
     [weightsText, setWeightsText] = useState("");
   const entryBatch = (() => {
@@ -184,6 +189,10 @@ export default function Shop() {
         setLocation(saved.location || "freezer");
         setTendered(saved.tendered || "");
         setDraftId(saved.draftId);
+        setFulfillment(
+          saved.fulfillment === "delivery" ? "delivery" : "walkin",
+        );
+        setDelivery(saved.delivery || emptyDelivery);
         checkoutKey.current = saved.key || "";
       }
     } catch {}
@@ -191,8 +200,11 @@ export default function Shop() {
       pendingCheckout.current = JSON.parse(
         localStorage.getItem("carved-pending-checkout") || "null",
       );
-      if (pendingCheckout.current?.cart)
+      if (pendingCheckout.current?.cart) {
         setCart(restoreCart(pendingCheckout.current.cart));
+        setFulfillment(pendingCheckout.current.data?.fulfillment || "walkin");
+        setDelivery(pendingCheckout.current.data?.delivery || emptyDelivery);
+      }
     } catch {}
     setCartReady(true);
     try {
@@ -215,10 +227,21 @@ export default function Shop() {
           location,
           tendered,
           draftId,
+          fulfillment,
+          delivery,
           key: checkoutKey.current,
         }),
       );
-  }, [cart, customer, location, tendered, draftId, cartReady]);
+  }, [
+    cart,
+    customer,
+    location,
+    tendered,
+    draftId,
+    cartReady,
+    fulfillment,
+    delivery,
+  ]);
   useEffect(() => {
     if (state) refresh().catch((e) => setError(e.message));
   }, [from, to]);
@@ -333,14 +356,18 @@ export default function Shop() {
       }
       return;
     }
-    if (!/^\d+(\.\d{1,3})?$/.test(weight) || Number(weight) <= 0) {
+    const normalizedWeight = normalizeQuantity(weight);
+    if (
+      !/^\d+(\.\d{1,3})?$/.test(normalizedWeight) ||
+      Number(normalizedWeight) <= 0
+    ) {
       setError("Enter a positive quantity with up to three decimals");
       return;
     }
     if (!cartChange()) return;
     try {
       validateCartLine({
-        quantity: weight,
+        quantity: qty(weightGrams(normalizedWeight)),
         price,
         tier,
         boxes,
@@ -357,7 +384,7 @@ export default function Shop() {
         productId: selected.id,
         name: selected.name,
         unit: selected.unit,
-        quantity: weight,
+        quantity: qty(weightGrams(normalizedWeight)),
         weightEntries: entryBatch?.entries,
         tier,
         price,
@@ -380,6 +407,7 @@ export default function Shop() {
     if (busy) return;
     if (!pendingCheckout.current) {
       try {
+        parseFulfillment(fulfillment, delivery);
         cart.forEach(validateCartLine);
       } catch (error) {
         setError((error as Error).message);
@@ -391,6 +419,7 @@ export default function Shop() {
         action,
         key: checkoutKey.current,
         data: {
+          ...parseFulfillment(fulfillment, delivery),
           locationId: location,
           partyId: customer || undefined,
           lines: cart.map(
@@ -430,6 +459,8 @@ export default function Shop() {
       setTendered("");
       setCustomer("");
       setDraftId(undefined);
+      setFulfillment("walkin");
+      setDelivery(emptyDelivery);
       checkoutKey.current = "";
       localStorage.removeItem("carved-cart");
       if (request.action === "sale")
@@ -693,6 +724,8 @@ export default function Shop() {
       })),
     );
     setCustomer(d.party_id || "");
+    setFulfillment(d.data.fulfillment || "walkin");
+    setDelivery(d.data.delivery || emptyDelivery);
     setLocation(d.data.locationId);
     setDraftId(d.id);
     setPage("Sales / POS");
@@ -1065,7 +1098,15 @@ export default function Shop() {
                                   </button>
                                   <small>{date(d.created_at)}</small>
                                 </td>
-                                <td>{partyName(d.party_id)}</td>
+                                <td>
+                                  {d.data.fulfillment === "delivery" &&
+                                  !d.party_id
+                                    ? d.data.delivery?.recipient
+                                    : partyName(d.party_id)}
+                                  {d.data.fulfillment === "delivery" && (
+                                    <small>Delivery</small>
+                                  )}
+                                </td>
                                 <td className="numeric">{php(d.data.total)}</td>
                                 <td>
                                   <Pill tone={d.balance ? "amber" : "green"}>
@@ -1300,7 +1341,7 @@ export default function Shop() {
                         <p aria-live="polite">
                           {entryBatch
                             ? `${entryBatch.boxes} weights - total ${entryBatch.quantity} kg`
-                            : "Enter one positive weight per line. You can also paste weights separated by commas or spaces."}
+                            : "For 6 boxes, enter 6 separate weights (one per line). You can also paste weights separated by commas or spaces. Box count is automatic."}
                         </p>
                       </div>
                     )}
@@ -1419,8 +1460,12 @@ export default function Shop() {
                   <div>
                     <h2>Current order</h2>
                     <p>
-                      {draftId ? "Saved invoice draft" : "Walk-in sale"} ·{" "}
-                      {cart.length} items
+                      {draftId
+                        ? "Saved invoice draft"
+                        : fulfillment === "delivery"
+                          ? "Delivery sale"
+                          : "Walk-in sale"}{" "}
+                      · {cart.length} items
                     </p>
                   </div>
                   <ShoppingBasket size={21} />
@@ -1441,6 +1486,66 @@ export default function Shop() {
                       ))}
                     </select>
                   </Field>
+                  <Field label="Order type">
+                    <select
+                      aria-label="Order type"
+                      value={fulfillment}
+                      disabled={busy}
+                      onChange={(e) => {
+                        if (!cartChange()) return;
+                        setFulfillment(e.target.value);
+                      }}
+                    >
+                      <option value="walkin">Walk-in</option>
+                      <option value="delivery">Delivery</option>
+                    </select>
+                  </Field>
+                  {fulfillment === "delivery" && (
+                    <div className="delivery-fields">
+                      {[
+                        ["recipient", "Delivery recipient"],
+                        ["contact", "Delivery contact number"],
+                        ["address", "Delivery address"],
+                        ["notes", "Delivery notes (optional)"],
+                      ].map(([key, label]) => (
+                        <Field key={key} label={label}>
+                          {key === "address" || key === "notes" ? (
+                            <textarea
+                              aria-label={label}
+                              rows={key === "address" ? 3 : 2}
+                              value={delivery[key] || ""}
+                              disabled={busy}
+                              onChange={(e) => {
+                                if (!cartChange()) return;
+                                setDelivery((current) => ({
+                                  ...current,
+                                  [key]: e.target.value,
+                                }));
+                              }}
+                            />
+                          ) : (
+                            <input
+                              aria-label={label}
+                              value={delivery[key] || ""}
+                              type={key === "contact" ? "tel" : "text"}
+                              disabled={busy}
+                              onChange={(e) => {
+                                if (!cartChange()) return;
+                                setDelivery((current) => ({
+                                  ...current,
+                                  [key]: e.target.value,
+                                }));
+                              }}
+                            />
+                          )}
+                        </Field>
+                      ))}
+                      <small>
+                        Delivery details appear on the receipt. No delivery
+                        charge is added.
+                      </small>
+                    </div>
+                  )}
                   <Field label="Customer">
                     <select
                       value={customer}
@@ -1449,7 +1554,11 @@ export default function Shop() {
                         setCustomer(e.target.value);
                       }}
                     >
-                      <option value="">Walk-in · full payment required</option>
+                      <option value="">
+                        {fulfillment === "delivery"
+                          ? "Guest customer · full payment required"
+                          : "Walk-in · full payment required"}
+                      </option>
                       {customers.map((c: R) => (
                         <option value={c.id} key={c.id}>
                           {c.name}
@@ -1810,7 +1919,14 @@ export default function Shop() {
                               {d.data.reference || "No supplier reference"}
                             </small>
                           </td>
-                          <td>{partyName(d.party_id)}</td>
+                          <td>
+                            {d.data.fulfillment === "delivery" && !d.party_id
+                              ? d.data.delivery?.recipient
+                              : partyName(d.party_id)}
+                            {d.data.fulfillment === "delivery" && (
+                              <small>Delivery</small>
+                            )}
+                          </td>
                           <td>
                             {d.data.lines.map((l: R, i: number) => (
                               <small key={i}>
@@ -1907,7 +2023,14 @@ export default function Shop() {
                               <strong>{number(d, s.settings)}</strong>
                               <small>{date(d.created_at)}</small>
                             </td>
-                            <td>{partyName(d.party_id)}</td>
+                            <td>
+                              {d.data.fulfillment === "delivery" && !d.party_id
+                                ? d.data.delivery?.recipient
+                                : partyName(d.party_id)}
+                              {d.data.fulfillment === "delivery" && (
+                                <small>Delivery</small>
+                              )}
+                            </td>
                             <td className="numeric">{php(d.data.total)}</td>
                             <td className="numeric">
                               {d.kind === "sale" ? php(d.balance) : "—"}
@@ -2308,7 +2431,15 @@ export default function Shop() {
                           )
                           .map((d) => (
                             <tr key={d.id}>
-                              <td>{partyName(d.party_id)}</td>
+                              <td>
+                                {d.data.fulfillment === "delivery" &&
+                                !d.party_id
+                                  ? d.data.delivery?.recipient
+                                  : partyName(d.party_id)}
+                                {d.data.fulfillment === "delivery" && (
+                                  <small>Delivery</small>
+                                )}
+                              </td>
                               <td>{number(d, s.settings)}</td>
                               <td className="numeric">{php(d.balance)}</td>
                             </tr>

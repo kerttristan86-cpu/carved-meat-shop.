@@ -1,3 +1,4 @@
+import { parseFulfillment } from "./fulfillment";
 import { validateWeightEntries } from "./weight-entries";
 import { deleteUnusedRecord } from "./record-deletion";
 import { createHash, randomUUID } from "node:crypto";
@@ -478,6 +479,7 @@ export async function execute(
       );
       result = { id: d.id };
     } else if (action === "draft" || action === "sale") {
+      const fulfillment = parseFulfillment(input.fulfillment, input.delivery);
       await ensureParty(tx, input.partyId, "customer");
       const lines = [];
       const reserved = new Map<string, number>();
@@ -582,6 +584,7 @@ export async function execute(
       const shop = (await one(tx, "SELECT data FROM settings WHERE id='shop'"))
         .data;
       const data = {
+        ...fulfillment,
         lines,
         total,
         cogs,

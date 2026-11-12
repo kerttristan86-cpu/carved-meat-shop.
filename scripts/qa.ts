@@ -1,3 +1,4 @@
+import { verifyDelivery } from "./qa-delivery";
 import { verifyMultiweights } from "./qa-multiweights";
 import { verifyDeletion } from "./qa-deletion";
 import { chromium } from "@playwright/test";
@@ -1083,6 +1084,7 @@ async function main() {
     await page.emulateMedia({ reducedMotion: "no-preference" });
     await verifyDeletion(page, context);
     await verifyMultiweights(page, context);
+    await verifyDelivery(page, context);
     assert.deepEqual(errors, []);
     console.log(
       "PASS: owner login, closed registration, authorization, CSRF, purchase/receive/transfer, tablet POS, decimal sale/change, receipt preview/reprint, expense, return, partial balances, all modules, tablet screenshots and 80mm PDF.",

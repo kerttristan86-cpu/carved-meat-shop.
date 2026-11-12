@@ -27,7 +27,7 @@ export async function verifyMultiweights(page: Page, context: BrowserContext) {
     productId: p.id,
     partyId: supplier.id,
     locationId: "freezer",
-    quantity: "40",
+    quantity: "100",
     cost: "100",
   });
   await page.reload({ waitUntil: "domcontentloaded" });
@@ -58,16 +58,16 @@ export async function verifyMultiweights(page: Page, context: BrowserContext) {
     .check();
   await page
     .getByLabel("Weights per box / entry (kg)", { exact: true })
-    .fill("11.67\n11.46\n11.39");
+    .fill("11.67\n11.46\n11.39\n12.36\n.50\n1.25");
   assert.equal(
     await page.getByLabel("Quantity", { exact: true }).inputValue(),
-    "34.520",
+    "48.630",
   );
   assert.equal(
     await page
       .getByLabel("Box count (actual kg entered separately)", { exact: true })
       .inputValue(),
-    "3",
+    "6",
   );
   await page.screenshot({
     path: "test-results/multiple-box-weights.png",
@@ -77,7 +77,11 @@ export async function verifyMultiweights(page: Page, context: BrowserContext) {
   await page
     .getByRole("button", { name: "Save invoice draft", exact: true })
     .click();
-  await page.getByText("Draft saved. Stock and accounting will post at checkout.", { exact: true }).waitFor();
+  await page
+    .getByText("Draft saved. Stock and accounting will post at checkout.", {
+      exact: true,
+    })
+    .waitFor();
   const draftState = await (
     await context.request.get("http://127.0.0.1:3100/api/shop")
   ).json();
@@ -85,7 +89,10 @@ export async function verifyMultiweights(page: Page, context: BrowserContext) {
     (d: any) =>
       d.kind === "draft" && d.data.lines.some((l: any) => l.productId === p.id),
   );
-  assert.deepEqual(draft.data.lines[0].weightEntries, [11670, 11460, 11390]);
+  assert.deepEqual(
+    draft.data.lines[0].weightEntries,
+    [11670, 11460, 11390, 12360, 500, 1250],
+  );
   const label = `${draftState.settings.prefix}-${String(draft.number).padStart(6, "0")}`;
   await page.getByRole("button", { name: "Invoices", exact: true }).click();
   await page
@@ -93,7 +100,7 @@ export async function verifyMultiweights(page: Page, context: BrowserContext) {
     .filter({ hasText: label })
     .getByRole("button", { name: "Open in POS", exact: true })
     .click();
-  await page.getByLabel("Cash tendered (PHP)", { exact: true }).fill("6000");
+  await page.getByLabel("Cash tendered (PHP)", { exact: true }).fill("9000");
   await page
     .getByRole("button", { name: "Complete sale", exact: true })
     .click();
@@ -101,10 +108,10 @@ export async function verifyMultiweights(page: Page, context: BrowserContext) {
     .getByRole("dialog", { name: "Saved receipt preview", exact: true })
     .waitFor();
   const receipt = await page.locator("#receipt").innerText();
-  assert.match(receipt, /34\.520/);
-  assert.match(receipt, /3 boxes/);
+  assert.match(receipt, /48\.630/);
+  assert.match(receipt, /6 boxes/);
   assert.match(receipt, /11\.670.*11\.460.*11\.390/s);
-  assert.match(receipt, /5,868\.40/);
+  assert.match(receipt, /8,267\.10/);
   await page
     .getByRole("status")
     .filter({ hasText: "Receipt sent to QA weight printer" })
@@ -115,7 +122,7 @@ export async function verifyMultiweights(page: Page, context: BrowserContext) {
   const text = new TextDecoder().decode(Uint8Array.from(bytes));
   assert.match(text, /Weights \(kg\):/);
   assert.match(text, /11\.670.*11\.460.*11\.390/s);
-  assert.match(text, /PHP 5,868\.40/);
+  assert.match(text, /PHP 8,267\.10/);
   assert.deepEqual(bytes.slice(-7), [27, 100, 4, 29, 86, 66, 0]);
   const final = await (
     await context.request.get("http://127.0.0.1:3100/api/shop")
@@ -124,7 +131,7 @@ export async function verifyMultiweights(page: Page, context: BrowserContext) {
     final.stock.find(
       (x: any) => x.product_id === p.id && x.location_id === "freezer",
     ).quantity,
-    5480,
+    51370,
   );
   assert.equal(final.report.balanced, true);
   await page.screenshot({

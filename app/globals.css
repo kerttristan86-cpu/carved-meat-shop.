@@ -2082,3 +2082,19 @@ button.printer-status {
   overflow-wrap: anywhere;
   margin: 6px 0 10px;
 }
+
+.delivery-fields {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+}
+.delivery-fields textarea {
+  min-height: 70px;
+}
+#receipt .receipt-delivery {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
