@@ -1,0 +1,13 @@
+# Never upload private shop data, secrets or local build output.
+.env*
+!.env.example
+backups/
+data/
+test-results/
+video-analysis/
+.media-tools/
+.next/
+node_modules/
+*.crt
+*.carved-backup.json
+tsconfig.tsbuildinfo

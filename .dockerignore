@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.codex
+.agents
+.aws
+.env*
+data
+backups
+test-results
+playwright-report
+.media-tools
+video-analysis
