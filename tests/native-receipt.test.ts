@@ -7,16 +7,18 @@ import {
 } from "../lib/native-receipt";
 import { readPrintQuality } from "../lib/thermal-printer";
 
-test("receipt printing defaults to sharper raster output but honors Fast preference", () => {
+test("receipt printing ignores legacy Fast setting and honors the current preference", () => {
   const previous = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
-  let quality: string | null = null;
+  const preferences = new Map([
+    ["carved-print-quality", "fast"],
+  ]);
   Object.defineProperty(globalThis, "localStorage", {
     configurable: true,
-    value: { getItem: () => quality },
+    value: { getItem: (key: string) => preferences.get(key) || null },
   });
   try {
     assert.equal(readPrintQuality(), "sharp");
-    quality = "fast";
+    preferences.set("carved-print-quality-v2", "fast");
     assert.equal(readPrintQuality(), "fast");
   } finally {
     if (previous) Object.defineProperty(globalThis, "localStorage", previous);

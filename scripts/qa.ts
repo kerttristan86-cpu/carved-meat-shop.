@@ -79,6 +79,9 @@ async function main() {
     await page
       .getByRole("heading", { name: "A clear view of your shop." })
       .waitFor();
+    await page.evaluate(() =>
+      localStorage.setItem("carved-print-quality", "fast"),
+    );
     let seq = 0;
     const api = async (action: string, data: any, key?: string) => {
       const r = await context.request.post("http://127.0.0.1:3100/api/shop", {
@@ -388,12 +391,16 @@ async function main() {
     assert.equal(await printQuality.inputValue(), "sharp");
     await printQuality.selectOption("sharp");
     assert.equal(
-      await page.evaluate(() => localStorage.getItem("carved-print-quality")),
+      await page.evaluate(() =>
+        localStorage.getItem("carved-print-quality-v2"),
+      ),
       "sharp",
     );
     await printQuality.selectOption("fast");
     assert.equal(
-      await page.evaluate(() => localStorage.getItem("carved-print-quality")),
+      await page.evaluate(() =>
+        localStorage.getItem("carved-print-quality-v2"),
+      ),
       "fast",
     );
 
@@ -527,6 +534,18 @@ async function main() {
       return {
         width: r.width,
         overflow: el.scrollWidth > el.clientWidth,
+        totalFontSize: parseFloat(
+          getComputedStyle(
+            el.querySelector(".receipt-grand-total strong")!,
+          ).fontSize,
+        ),
+        regularFontSize: parseFloat(
+          getComputedStyle(
+            el.querySelector(
+              ".receipt-total:not(.receipt-grand-total)",
+            )!,
+          ).fontSize,
+        ),
         amountsFit: [
           ...el.querySelectorAll(
             ".receipt-line b,.receipt-total > :last-child",
@@ -545,6 +564,10 @@ async function main() {
       printBounds.amountsFit,
       true,
       "Full amounts, including decimals, must remain inset from the print edge",
+    );
+    assert.ok(
+      printBounds.totalFontSize >= printBounds.regularFontSize * 1.19,
+      "TOTAL and its amount are at least 19% larger than the other rows",
     );
     await page.screenshot({
       path: "test-results/receipt-print.png",

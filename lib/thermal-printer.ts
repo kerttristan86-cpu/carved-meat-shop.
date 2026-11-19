@@ -121,7 +121,7 @@ export function fastRasterCommands(
 }
 export function readPrintQuality(): "fast" | "sharp" {
   try {
-    return localStorage.getItem("carved-print-quality") === "fast"
+    return localStorage.getItem("carved-print-quality-v2") === "fast"
       ? "fast"
       : "sharp";
   } catch {

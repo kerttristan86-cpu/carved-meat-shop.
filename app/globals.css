@@ -1232,6 +1232,9 @@ summary {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+.receipt-grand-total {
+  font-size: 1.2em;
+}
 .receipt-total span:last-child,
 .receipt-total strong:last-child {
   white-space: nowrap;

@@ -261,7 +261,7 @@ export default function ReceiptDialog({
           </div>
         ))}
         <hr />
-        <div className="receipt-total">
+        <div className="receipt-total receipt-grand-total">
           <strong>TOTAL</strong>
           <strong>{php(d.data.total)}</strong>
         </div>
@@ -312,7 +312,7 @@ export default function ReceiptDialog({
             onChange={(e) => {
               const value = e.target.value as "fast" | "sharp";
               try {
-                localStorage.setItem("carved-print-quality", value);
+                localStorage.setItem("carved-print-quality-v2", value);
               } catch {
                 setMessage(
                   "Cannot save print quality. Allow browser storage and try again.",
