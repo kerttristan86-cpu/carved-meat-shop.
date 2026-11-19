@@ -5,7 +5,24 @@ import {
   nativeColumns,
   printerText,
 } from "../lib/native-receipt";
+import { readPrintQuality } from "../lib/thermal-printer";
 
+test("receipt printing defaults to sharper raster output but honors Fast preference", () => {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  let quality: string | null = null;
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: { getItem: () => quality },
+  });
+  try {
+    assert.equal(readPrintQuality(), "sharp");
+    quality = "fast";
+    assert.equal(readPrintQuality(), "fast");
+  } finally {
+    if (previous) Object.defineProperty(globalThis, "localStorage", previous);
+    else Reflect.deleteProperty(globalThis, "localStorage");
+  }
+});
 test("native receipts keep full decimal amounts and wrap long labels within the print width", () => {
   const rows = nativeColumns(
     "Cash tendered with a very long label",

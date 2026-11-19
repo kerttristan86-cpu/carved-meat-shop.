@@ -180,7 +180,7 @@ export default function ReceiptDialog({
         style={
           {
             "--receipt-margin": `${s.margin}mm`,
-            "--receipt-font": `${Math.max(13, Number(s.density) || 13)}px`,
+            "--receipt-font": `${Math.max(13, Number(s.density) || 13) * 1.12}px`,
           } as React.CSSProperties
         }
       >
@@ -351,8 +351,8 @@ export default function ReceiptDialog({
           </label>
         )}
         <p>
-          Fast text uses the printer font and PHP currency labels. The receipt
-          preview keeps its original appearance.
+          Sharper prints the receipt at 576 dots with the enlarged text. Fast
+          uses the printer's fixed-size font and PHP currency labels.
         </p>
         <button disabled={busy} onClick={connect}>
           {connection ? `Connected: ${connection}` : "Connect printer"}

@@ -385,7 +385,7 @@ async function main() {
       "Receipt capture must remain exact even during immediate automatic printing",
     );
     const printQuality = page.getByLabel("Print mode", { exact: true });
-    assert.equal(await printQuality.inputValue(), "fast");
+    assert.equal(await printQuality.inputValue(), "sharp");
     await printQuality.selectOption("sharp");
     assert.equal(
       await page.evaluate(() => localStorage.getItem("carved-print-quality")),
@@ -424,6 +424,45 @@ async function main() {
       await page.evaluate(() => [...new Set((window as any).qaPrintTargets)]),
       ["QA selected printer"],
     );
+    const sharpWithLogo = await page.evaluate(
+      () => (window as any).qaPrintBytes as number[],
+    );
+    assert.ok(
+      sharpWithLogo.length > 2500,
+      "Sharper default sends the full-resolution receipt raster",
+    );
+    const sharpHeader = sharpWithLogo.findIndex(
+      (b, i) =>
+        b === 29 &&
+        sharpWithLogo[i + 1] === 118 &&
+        sharpWithLogo[i + 2] === 48,
+    );
+    assert.ok(sharpHeader >= 0, "Sharper receipt includes raster image data");
+    assert.deepEqual(
+      sharpWithLogo.slice(sharpHeader, sharpHeader + 6),
+      [29, 118, 48, 0, 72, 0],
+      "Sharper receipt stays within the 576-dot paper width",
+    );
+    const cutSequence = [27, 100, 4, 29, 86, 66, 0];
+    const cutCount = (bytes: number[]) =>
+      bytes.filter((_, i) => cutSequence.every((b, k) => bytes[i + k] === b))
+        .length;
+    assert.deepEqual(sharpWithLogo.slice(-7), cutSequence);
+    assert.equal(
+      cutCount(sharpWithLogo),
+      1,
+      "New POS sale prints exactly one complete raster receipt",
+    );
+    await page.evaluate(() => {
+      (window as any).qaPrintBytes = [];
+    });
+    await page
+      .getByRole("button", { name: "Print receipt", exact: true })
+      .click();
+    await page
+      .getByRole("status")
+      .filter({ hasText: "Receipt sent to the printer" })
+      .waitFor();
     const nativeWithLogo = await page.evaluate(
       () => (window as any).qaPrintBytes as number[],
     );
@@ -442,16 +481,8 @@ async function main() {
       nativeWithLogo.slice(logoHeader, logoHeader + 8),
       [29, 118, 48, 0, 12, 0, 96, 0],
     );
-    const cutSequence = [27, 100, 4, 29, 86, 66, 0];
-    const cutCount = (bytes: number[]) =>
-      bytes.filter((_, i) => cutSequence.every((b, k) => bytes[i + k] === b))
-        .length;
     assert.deepEqual(nativeWithLogo.slice(-7), cutSequence);
-    assert.equal(
-      cutCount(nativeWithLogo),
-      1,
-      "New POS sale prints exactly one complete receipt",
-    );
+    assert.equal(cutCount(nativeWithLogo), 1);
     assert.ok(
       new TextDecoder()
         .decode(new Uint8Array(nativeWithLogo))
@@ -480,7 +511,7 @@ async function main() {
     assert.ok(nativeText.includes("PHP 1,422.05"));
     assert.deepEqual(nativeNoLogo.slice(-7), [27, 100, 4, 29, 86, 66, 0]);
     console.log(
-      `Native receipt bytes: ${nativeWithLogo.length} with logo; ${nativeNoLogo.length} text only`,
+      `Receipt bytes: ${sharpWithLogo.length} Sharper; ${nativeWithLogo.length} Fast with logo; ${nativeNoLogo.length} text only`,
     );
     await page.getByLabel(/Include logo/).check();
 

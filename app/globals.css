@@ -1220,8 +1220,11 @@ summary {
   gap: 3mm;
   margin-top: 1mm;
 }
-.receipt-line span {
-  max-width: 43mm;
+.receipt-line > div {
+  /* Extra layout width keeps enlarged item details beside the right-aligned amount. */
+  width: 111.12%;
+  transform: scaleX(0.9);
+  transform-origin: left center;
 }
 .receipt-line b {
   white-space: nowrap;
@@ -1235,9 +1238,7 @@ summary {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.review-note {
-  font-size: 11px !important;
-}
+
 .login {
   min-height: 100vh;
   display: flex;

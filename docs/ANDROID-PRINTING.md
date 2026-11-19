@@ -65,16 +65,15 @@ No deployment or database changes were made by this update.
 
 ## Fast / Sharper print quality
 
-The receipt dialog defaults to Fast and remembers the choice on that browser.
-Fast reduces the raster to half width and height using black-dot-preserving
-max-pooling, then uses ESC/POS double-width/double-height raster mode to retain
-physical paper size. Text and logo edges become bolder and coarser. Choose Sharper
-for the previous full-resolution output. The saved preview and image export retain
-full resolution. Transfer pacing and failed-write handling are unchanged.
+The receipt dialog defaults to Sharper and remembers the choice on that browser.
+Fast uses the printer's native fixed-size Font A for text. Sharper rasterizes the
+receipt at full resolution; it is used by default to support the moderately
+larger receipt text. The 576-dot output width, saved preview, and image export are
+preserved. Transfer pacing and failed-write handling are unchanged.
 
-The 576 x 987 sample measured 7,553 bytes in Fast versus 28,189 in Sharper (73.2%
-less). Actual elapsed time, spacing, legibility and cutter behavior require a test
-on the physical printer. Fast may add one white dot row for odd image heights.
+The 576 x 987 sample measured 7,553 bytes in the former scaled Fast raster versus
+28,189 in Sharper (73.2% less). Actual elapsed time, spacing, legibility and
+cutter behavior require a test on the physical printer.
 
 ## November 6: APX-style native text replaces Fast image mode
 
