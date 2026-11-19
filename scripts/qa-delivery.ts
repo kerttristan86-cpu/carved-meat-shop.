@@ -40,6 +40,30 @@ export async function verifyDelivery(page: Page, context: BrowserContext) {
   await page.getByRole("button", { name: "Add to order", exact: true }).click();
   assert.match(await page.locator(".cart-line").innerText(), /0\.500/);
   await page.getByLabel("Order type", { exact: true }).selectOption("delivery");
+  await page.setViewportSize({ width: 375, height: 812 });
+  const cart = page.locator(".cart");
+  const cartScroll = await cart.evaluate((el) => ({
+    clientHeight: el.clientHeight,
+    overflowY: getComputedStyle(el).overflowY,
+    scrollHeight: el.scrollHeight,
+  }));
+  assert.equal(cartScroll.overflowY, "auto");
+  assert.ok(
+    cartScroll.scrollHeight > cartScroll.clientHeight,
+    "Delivery order panel scrolls within the mobile viewport",
+  );
+  const paymentMethod = page.getByLabel("Payment method", { exact: true });
+  await paymentMethod.scrollIntoViewIfNeeded();
+  assert.ok(
+    await paymentMethod.evaluate((el) => {
+      const bounds = el.getBoundingClientRect();
+      return bounds.top >= 0 && bounds.bottom <= window.innerHeight;
+    }),
+    "Lower delivery fields are reachable by scrolling the order panel",
+  );
+  await cart.evaluate((el) => {
+    el.scrollTop = 0;
+  });
   assert.equal(await page.getByLabel("Cash tendered (PHP)").count(), 0);
   await page
     .getByRole("button", { name: "Complete sale", exact: true })

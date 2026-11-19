@@ -791,6 +791,29 @@ tfoot th:first-child {
 .cart {
   position: sticky;
   top: 18px;
+  max-height: calc(100vh - 36px);
+  max-height: calc(100dvh - 36px);
+  overflow-y: auto;
+  scrollbar-color: #78a7bf #eaf5fa;
+  scrollbar-width: thin;
+}
+.cart::-webkit-scrollbar {
+  width: 8px;
+}
+.cart::-webkit-scrollbar-track {
+  border-radius: 8px;
+  background: #eaf5fa;
+}
+.cart::-webkit-scrollbar-thumb {
+  border: 2px solid #eaf5fa;
+  border-radius: 8px;
+  background: #78a7bf;
+}
+.cart .panel-heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: white;
 }
 .cart .panel-heading {
   padding: 19px;
@@ -1526,6 +1549,8 @@ code {
   }
   .cart {
     position: static;
+    max-height: calc(100vh - 76px);
+    max-height: calc(100dvh - 76px);
   }
   .products-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

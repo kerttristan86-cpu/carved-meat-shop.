@@ -1465,7 +1465,11 @@ export default function Shop() {
                   </section>
                 )}
               </section>
-              <aside className="cart panel">
+              <aside
+                className="cart panel"
+                aria-label="Current order"
+                tabIndex={0}
+              >
                 <div className="panel-heading">
                   <div>
                     <h2>Current order</h2>
