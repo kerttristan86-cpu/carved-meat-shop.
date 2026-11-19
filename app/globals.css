@@ -1222,8 +1222,8 @@ summary {
 }
 .receipt-line > div {
   /* Extra layout width keeps enlarged item details beside the right-aligned amount. */
-  width: 111.12%;
-  transform: scaleX(0.9);
+  width: 125%;
+  transform: scaleX(0.8);
   transform-origin: left center;
 }
 .receipt-line b {

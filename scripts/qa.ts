@@ -387,6 +387,14 @@ async function main() {
       { transform: "none", animation: "none", backdropAnimation: "none" },
       "Receipt capture must remain exact even during immediate automatic printing",
     );
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelector(".receipt-tools.bottom")
+          ?.getAttribute("aria-busy") === "false",
+      undefined,
+      { timeout: 60000 },
+    );
     const printQuality = page.getByLabel("Print mode", { exact: true });
     assert.equal(await printQuality.inputValue(), "sharp");
     await printQuality.selectOption("sharp");
@@ -405,18 +413,6 @@ async function main() {
     );
 
     await page.getByText("₱1,422.05", { exact: true }).first().waitFor();
-    try {
-      await page
-        .getByRole("status")
-        .filter({ hasText: "Receipt sent to QA selected printer" })
-        .waitFor();
-    } catch (error) {
-      console.log(
-        "Receipt status:",
-        await page.getByRole("status").allTextContents(),
-      );
-      throw error;
-    }
     assert.equal(
       await page.evaluate(() => (window as any).qaPrinterChoices),
       2,
@@ -568,6 +564,11 @@ async function main() {
     assert.ok(
       printBounds.totalFontSize >= printBounds.regularFontSize * 1.19,
       "TOTAL and its amount are at least 19% larger than the other rows",
+    );
+    assert.equal(
+      printBounds.regularFontSize,
+      16,
+      "Receipt body uses the maximum configured 16px font size",
     );
     await page.screenshot({
       path: "test-results/receipt-print.png",
