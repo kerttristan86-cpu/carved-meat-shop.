@@ -1,0 +1,14 @@
+node_modules/
+.next/
+.env*
+!.env.example
+data/
+backups/
+test-results/
+playwright-report/
+*.tsbuildinfo
+.media-tools/
+video-analysis/
+__pycache__/
+.vercel
+*.crt
