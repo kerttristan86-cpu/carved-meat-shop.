@@ -285,7 +285,8 @@ export default function ReceiptDialog({
         <hr />
         <p>{settings.footer}</p>
         <p className="review-note">
-          THIS IS A REQUEST FOR PAYMENT. THIS IS NOT A SALES INVOICE.
+          This document is not valid for input tax. Please ask for your sales
+          invoice.
         </p>
       </div>
       <div className="receipt-tools bottom" aria-busy={busy}>
