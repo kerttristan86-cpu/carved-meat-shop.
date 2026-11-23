@@ -265,11 +265,11 @@ export default function ReceiptDialog({
           <span>Cash tendered</span>
           <span>{php(d.data.tendered)}</span>
         </div>
+        <hr className="receipt-exchange-line" />
         <div className="receipt-total">
           <span>Exchange</span>
           <span>{php(d.data.change)}</span>
         </div>
-        <hr className="receipt-exchange-line" />
         {payments.map((p) => (
           <div className="receipt-total" key={p.id}>
             <span>Later payment · {date(p.created_at)}</span>
