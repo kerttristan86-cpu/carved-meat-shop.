@@ -189,11 +189,7 @@ export default function ReceiptDialog({
         {settings.address && <p>{settings.address}</p>}
         {settings.contact && <p>{settings.contact}</p>}
         {settings.invoiceDetails && <p>{settings.invoiceDetails}</p>}
-        <h4>
-          {slip
-            ? "Internal order slip · not an invoice"
-            : "Request for payment"}
-        </h4>
+        {slip && <h4>Internal order slip · not an invoice</h4>}
 
         <p>
           {number(d, settings)}
@@ -270,9 +266,10 @@ export default function ReceiptDialog({
           <span>{php(d.data.tendered)}</span>
         </div>
         <div className="receipt-total">
-          <span>Change</span>
+          <span>Exchange</span>
           <span>{php(d.data.change)}</span>
         </div>
+        <hr className="receipt-exchange-line" />
         {payments.map((p) => (
           <div className="receipt-total" key={p.id}>
             <span>Later payment · {date(p.created_at)}</span>
@@ -288,9 +285,7 @@ export default function ReceiptDialog({
         <hr />
         <p>{settings.footer}</p>
         <p className="review-note">
-          This document is not valid for input tax. This is a request for
-          payment. This is not a sales invoice. Please ask for your sales
-          invoice.
+          THIS IS A REQUEST FOR PAYMENT. THIS IS NOT A SALES INVOICE.
         </p>
       </div>
       <div className="receipt-tools bottom" aria-busy={busy}>
